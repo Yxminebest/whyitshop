@@ -1,9 +1,14 @@
-import { useContext, useState } from "react";
+import { useContext, useState, useEffect } from "react";
 import { CartContext } from "../context/CartContext";
 import { supabase } from "../lib/supabase";
+import { useNavigate } from "react-router-dom";
 
 function Cart() {
-  const { cartItems, removeFromCart } = useContext(CartContext);
+  const { cartItems, removeFromCart, setCartItems } = useContext(CartContext);
+
+  const navigate = useNavigate();
+
+  const [user, setUser] = useState(null);
 
   const [coupon, setCoupon] = useState("");
   const [discount, setDiscount] = useState(0);
@@ -20,6 +25,17 @@ function Cart() {
   );
 
   const finalPrice = Math.max(totalPrice - discount, 0);
+
+  /* ================= GET USER ================= */
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data?.user || null);
+    };
+
+    getUser();
+  }, []);
 
   /* ================= COUPON (DB) ================= */
 
@@ -43,7 +59,6 @@ function Cart() {
         return;
       }
 
-      // เช็คหมดอายุ
       if (data.expires_at && new Date(data.expires_at) < new Date()) {
         setDiscount(0);
         setMessage("คูปองหมดอายุ");
@@ -54,7 +69,7 @@ function Cart() {
 
       if (data.type === "percent") {
         discountValue = (totalPrice * data.value) / 100;
-      } else if (data.type === "fixed") {
+      } else {
         discountValue = data.value;
       }
 
@@ -66,13 +81,12 @@ function Cart() {
     }
   };
 
-  /* ================= SLIP UPLOAD ================= */
+  /* ================= SLIP ================= */
 
   const handleSlipUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // 🔒 OWASP validation
     if (!file.type.startsWith("image/")) {
       alert("อนุญาตเฉพาะไฟล์รูปภาพ");
       return;
@@ -91,15 +105,21 @@ function Cart() {
   /* ================= CONFIRM PAYMENT ================= */
 
   const confirmPayment = async () => {
+    if (!user) {
+      alert("กรุณา login ก่อน");
+      navigate("/login");
+      return;
+    }
+
     if (!slipFile) {
       alert("กรุณาแนบสลิปก่อน");
       return;
     }
 
     try {
-      const fileName = Date.now() + "_" + slipFile.name;
+      const fileName = `${user.id}_${Date.now()}`;
 
-      // upload
+      // upload slip
       const { error: uploadError } = await supabase.storage
         .from("slips")
         .upload(fileName, slipFile);
@@ -109,22 +129,21 @@ function Cart() {
         return;
       }
 
-      // get URL
+      // get url
       const { data: urlData } = supabase.storage
         .from("slips")
         .getPublicUrl(fileName);
 
       const slipUrl = urlData.publicUrl;
 
-      // create order
+      // insert order
       const { error } = await supabase.from("orders").insert([
         {
-          email: "customer@test.com",
+          email: user.email,
           items: cartItems,
           total_price: finalPrice,
           status: "pending",
           slip: slipUrl,
-          created_at: new Date(),
         },
       ]);
 
@@ -133,8 +152,12 @@ function Cart() {
         return;
       }
 
+      // success
       setPaymentStatus("ชำระเงินแล้ว ✔");
-      alert("ส่งคำสั่งซื้อสำเร็จ");
+      setCartItems([]); // 🔥 clear cart
+      alert("สั่งซื้อสำเร็จ");
+
+      navigate("/");
     } catch (err) {
       alert(err.message);
     }

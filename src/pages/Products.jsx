@@ -13,34 +13,20 @@ const { addToCart } = useContext(CartContext)
 
 /* ================= FETCH PRODUCTS ================= */
 
-useEffect(()=>{
+useEffect(() => {
+  fetchProducts()
+}, [])
 
-fetchProducts()
+const fetchProducts = async () => {
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
 
-},[])
-
-const fetchProducts = async ()=>{
-
-try{
-
-const { data, error } = await supabase
-.from("products")
-.select("*")
-
-if(error){
-console.log(error)
-}else{
-setProducts(data)
-}
-
-}catch(err){
-
-console.log(err)
-
-}
-
-setLoading(false)
-
+  if (error) {
+    console.log(error)
+  } else {
+    setProducts(data)
+  }
 }
 
 /* ================= SEARCH FILTER ================= */

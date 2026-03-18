@@ -1,193 +1,225 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../lib/supabase"
 
-function Profile(){
+function Profile() {
 
-const [user,setUser] = useState(null)
+  const [user,setUser] = useState(null)
 
-const [username,setUsername] = useState("")
-const [firstname,setFirstname] = useState("")
-const [lastname,setLastname] = useState("")
-const [phone,setPhone] = useState("")
-const [address,setAddress] = useState("")
+  const [username,setUsername] = useState("")
+  const [firstname,setFirstname] = useState("")
+  const [lastname,setLastname] = useState("")
+  const [phone,setPhone] = useState("")
+  const [address,setAddress] = useState("")
 
-const [loading,setLoading] = useState(false)
+  const [avatar,setAvatar] = useState(null)
+  const [preview,setPreview] = useState(null)
 
-/* ================= GET USER ================= */
+  const [loading,setLoading] = useState(false)
 
-useEffect(()=>{
+  /* ================= GET USER ================= */
 
-getUser()
+  useEffect(()=>{
+    getUser()
+  },[])
 
-},[])
+  const getUser = async ()=>{
+    const { data } = await supabase.auth.getUser()
 
-const getUser = async ()=>{
+    if(data?.user){
+      setUser(data.user)
+      loadProfile(data.user.id)
+    }
+  }
 
-const { data } = await supabase.auth.getUser()
+  /* ================= LOAD PROFILE ================= */
 
-if(data?.user){
+  const loadProfile = async(userId)=>{
 
-setUser(data.user)
+    const { data, error } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id",userId)
+    .single()
 
-loadProfile(data.user.id)
+    if(error){
+      console.log(error)
+    }else if(data){
+      setUsername(data.username || "")
+      setFirstname(data.firstname || "")
+      setLastname(data.lastname || "")
+      setPhone(data.phone || "")
+      setAddress(data.address || "")
+      setPreview(data.avatar || null) // 🔥 โหลดรูป
+    }
+  }
 
-}
+  /* ================= UPLOAD AVATAR ================= */
 
-}
+  const handleUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
 
-/* ================= LOAD PROFILE ================= */
+    // validate
+    if (!file.type.startsWith("image/")) {
+      alert("ต้องเป็นรูปภาพเท่านั้น")
+      return
+    }
 
-const loadProfile = async(userId)=>{
+    if (file.size > 2000000) {
+      alert("ไฟล์ต้องไม่เกิน 2MB")
+      return
+    }
 
-const { data, error } = await supabase
-.from("users")
-.select("*")
-.eq("id",userId)
-.single()
+    try {
 
-if(error){
+      const fileName = user.id + "_" + Date.now()
 
-console.log(error)
+      const { error } = await supabase.storage
+        .from("avatars")
+        .upload(fileName, file)
 
-}else if(data){
+      if (error) {
+        console.log(error)
+        alert("อัปโหลดไม่สำเร็จ")
+        return
+      }
 
-setUsername(data.username || "")
-setFirstname(data.firstname || "")
-setLastname(data.lastname || "")
-setPhone(data.phone || "")
-setAddress(data.address || "")
+      const { data } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(fileName)
 
-}
+      setAvatar(data.publicUrl)
+      setPreview(data.publicUrl)
 
-}
+    } catch (err) {
+      console.log(err)
+    }
+  }
 
-/* ================= SAVE PROFILE ================= */
+  /* ================= SAVE PROFILE ================= */
 
-const saveProfile = async ()=>{
+  const saveProfile = async ()=>{
 
-if(!user) return
+    if(!user) return
 
-try{
+    try{
 
-setLoading(true)
+      setLoading(true)
 
-const { error } = await supabase
-.from("users")
-.upsert({
-id:user.id,
-email:user.email,
-username,
-firstname,
-lastname,
-phone,
-address
-})
+      const { error } = await supabase
+      .from("users")
+      .upsert({
+        id:user.id,
+        email:user.email,
+        username,
+        firstname,
+        lastname,
+        phone,
+        address,
+        avatar: avatar || preview // 🔥 บันทึกรูป
+      })
 
-if(error){
+      if(error){
+        console.log(error)
+        alert("บันทึกไม่สำเร็จ")
+      }else{
+        alert("บันทึกข้อมูลแล้ว")
+      }
 
-console.log(error)
-alert("บันทึกไม่สำเร็จ")
+    }catch(err){
+      console.log(err)
+    }
 
-}else{
+    setLoading(false)
+  }
 
-alert("บันทึกข้อมูลแล้ว")
+  /* ================= UI ================= */
 
-}
+  return(
 
-}catch(err){
+  <div className="profile-page">
 
-console.log(err)
+    <div className="profile-card">
 
-}
+      <h2>👤 Personal Settings</h2>
 
-setLoading(false)
+      {/* 🔥 AVATAR */}
+      <div className="profile-avatar">
 
-}
+        <img
+          src={
+            preview ||
+            "https://cdn-icons-png.flaticon.com/512/149/149071.png"
+          }
+          alt="avatar"
+        />
 
-/* ================= UI ================= */
+        <input type="file" onChange={handleUpload} />
 
-return(
+      </div>
 
-<div className="profile-page">
+      <p className="profile-id">
+        Profile ID: {user?.id?.slice(0,10)}
+      </p>
 
-<div className="profile-card">
+      <div className="profile-form">
 
-<h2>👤 Personal Settings</h2>
+        <input
+          type="text"
+          placeholder="Username"
+          value={username}
+          onChange={(e)=>setUsername(e.target.value)}
+        />
 
-<div className="profile-avatar">
+        <input
+          type="text"
+          placeholder="Firstname"
+          value={firstname}
+          onChange={(e)=>setFirstname(e.target.value)}
+        />
 
-<img
-src="https://cdn-icons-png.flaticon.com/512/149/149071.png"
-alt="avatar"
-/>
+        <input
+          type="text"
+          placeholder="Lastname"
+          value={lastname}
+          onChange={(e)=>setLastname(e.target.value)}
+        />
 
-</div>
+        <input
+          type="email"
+          value={user?.email || ""}
+          disabled
+        />
 
-<p className="profile-id">
-Profile ID: {user?.id?.slice(0,10)}
-</p>
+        <input
+          type="text"
+          placeholder="Phone"
+          value={phone}
+          onChange={(e)=>setPhone(e.target.value)}
+        />
 
-<div className="profile-form">
+        <input
+          type="text"
+          placeholder="Address"
+          value={address}
+          onChange={(e)=>setAddress(e.target.value)}
+        />
 
-<input
-type="text"
-placeholder="Username"
-value={username}
-onChange={(e)=>setUsername(e.target.value)}
-/>
+      </div>
 
-<input
-type="text"
-placeholder="Firstname"
-value={firstname}
-onChange={(e)=>setFirstname(e.target.value)}
-/>
+      <button
+        className="profile-btn"
+        onClick={saveProfile}
+        disabled={loading}
+      >
+        {loading ? "Saving..." : "Submit"}
+      </button>
 
-<input
-type="text"
-placeholder="Lastname"
-value={lastname}
-onChange={(e)=>setLastname(e.target.value)}
-/>
+    </div>
 
-<input
-type="email"
-value={user?.email || ""}
-disabled
-/>
+  </div>
 
-<input
-type="text"
-placeholder="Phone"
-value={phone}
-onChange={(e)=>setPhone(e.target.value)}
-/>
-
-<input
-type="text"
-placeholder="Address"
-value={address}
-onChange={(e)=>setAddress(e.target.value)}
-/>
-
-</div>
-
-<button
-className="profile-btn"
-onClick={saveProfile}
-disabled={loading}
->
-
-{loading ? "Saving..." : "Submit"}
-
-</button>
-
-</div>
-
-</div>
-
-)
-
+  )
 }
 
 export default Profile
