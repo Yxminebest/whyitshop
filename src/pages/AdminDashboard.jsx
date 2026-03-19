@@ -13,7 +13,11 @@ function AdminDashboard() {
   const [editId, setEditId] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  /* ================= LOAD ================= */
+  /* COUPON */
+  const [couponCode, setCouponCode] = useState("");
+  const [couponType, setCouponType] = useState("percent");
+  const [couponValue, setCouponValue] = useState("");
+  const [couponMsg, setCouponMsg] = useState("");
 
   useEffect(() => {
     fetchProducts();
@@ -25,13 +29,11 @@ function AdminDashboard() {
     if (error) {
       console.log("❌ fetch error:", error);
     } else {
-      console.log("✅ products:", data);
       setProducts(data || []);
     }
   };
 
   /* ================= SAVE PRODUCT ================= */
-
   const saveProduct = async () => {
     if (!name || !price || !category) {
       alert("กรอกข้อมูลให้ครบ");
@@ -44,7 +46,7 @@ function AdminDashboard() {
       const safeName = sanitizeInput(name);
       let imageUrl = null;
 
-      /* ===== FIX ชื่อไฟล์ ===== */
+      /* ===== UPLOAD ===== */
       if (image) {
         const cleanName = image.name
           .replace(/\s+/g, "_")
@@ -54,11 +56,13 @@ function AdminDashboard() {
 
         const { error: uploadError } = await supabase.storage
           .from("product-images")
-          .upload(fileName, image);
+          .upload(fileName, image, {
+            contentType: image.type, // 🔥 FIX สำคัญ
+          });
 
         if (uploadError) {
-          console.log(uploadError);
-          alert("อัปโหลดรูปไม่สำเร็จ");
+          console.log("UPLOAD ERROR:", uploadError);
+          alert("❌ อัปโหลดรูปไม่สำเร็จ");
           setLoading(false);
           return;
         }
@@ -84,9 +88,9 @@ function AdminDashboard() {
 
         if (error) {
           console.log(error);
-          alert("แก้ไขไม่สำเร็จ");
+          alert("❌ แก้ไขไม่สำเร็จ");
         } else {
-          alert("แก้ไขสินค้าแล้ว");
+          alert("✅ แก้ไขสินค้าแล้ว");
         }
 
         setEditId(null);
@@ -95,7 +99,7 @@ function AdminDashboard() {
       /* ===== INSERT ===== */
       else {
         if (!imageUrl) {
-          alert("กรุณาใส่รูปสินค้า");
+          alert("ต้องใส่รูป");
           setLoading(false);
           return;
         }
@@ -111,35 +115,33 @@ function AdminDashboard() {
 
         if (error) {
           console.log(error);
-          alert("เพิ่มสินค้าไม่สำเร็จ");
+          alert("❌ เพิ่มสินค้าไม่สำเร็จ");
         } else {
-          alert("เพิ่มสินค้าแล้ว");
+          alert("✅ เพิ่มสินค้าแล้ว");
         }
       }
 
-      /* ===== RESET ===== */
+      /* RESET */
       setName("");
       setPrice("");
       setCategory("");
       setImage(null);
 
-      /* 🔥 สำคัญ: refresh */
       await fetchProducts();
-
     } catch (err) {
-      console.log("❌ error:", err);
+      console.log("ERROR:", err);
     }
 
     setLoading(false);
   };
 
   /* ================= DELETE ================= */
-
   const deleteProduct = async (id) => {
+    if (!confirm("ยืนยันการลบ?")) return;
+
     const { error } = await supabase.from("products").delete().eq("id", id);
 
     if (error) {
-      console.log(error);
       alert("ลบไม่สำเร็จ");
     } else {
       fetchProducts();
@@ -147,7 +149,6 @@ function AdminDashboard() {
   };
 
   /* ================= EDIT ================= */
-
   const handleEdit = (item) => {
     setEditId(item.id);
     setName(item.name);
@@ -155,82 +156,110 @@ function AdminDashboard() {
     setCategory(item.category);
   };
 
+  /* ================= CREATE COUPON ================= */
+  const createCoupon = async () => {
+    if (!couponCode || !couponValue) {
+      setCouponMsg("❌ กรอกข้อมูลให้ครบ");
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from("coupons").insert([
+        {
+          code: couponCode.toUpperCase(),
+          type: couponType,
+          value: Number(couponValue),
+          is_active: true,
+        },
+      ]);
+
+      if (error) {
+        console.log(error);
+        setCouponMsg("❌ สร้างไม่สำเร็จ");
+      } else {
+        setCouponMsg("✅ สร้างคูปองสำเร็จ");
+        setCouponCode("");
+        setCouponValue("");
+      }
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
   /* ================= UI ================= */
 
   return (
-    <div style={{ padding: "40px", color: "white" }}>
-      <h1>🛠 Admin Dashboard</h1>
+    <div style={container}>
+      <h1 style={{ marginBottom: 20 }}>🛠 Admin Dashboard</h1>
 
-      {/* FORM */}
-      <h2 style={{ marginTop: "30px" }}>เพิ่มสินค้า</h2>
+      <div style={grid}>
+        {/* PRODUCT */}
+        <div style={card}>
+          <h2>📦 เพิ่มสินค้า</h2>
 
-      <div style={formBox}>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="ชื่อสินค้า"
-          style={input}
-        />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="ชื่อสินค้า" style={input}/>
+          <input value={price} onChange={(e) => setPrice(e.target.value)} type="number" placeholder="ราคา" style={input}/>
 
-        <input
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          type="number"
-          placeholder="ราคา"
-          style={input}
-        />
+          <select value={category} onChange={(e) => setCategory(e.target.value)} style={input}>
+            <option value="">หมวดหมู่</option>
+            <option>Mouse</option>
+            <option>Keyboard</option>
+            <option>Monitor</option>
+            <option>Headset</option>
+          </select>
 
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          style={input}
-        >
-          <option value="">หมวดหมู่</option>
-          <option>Mouse</option>
-          <option>Keyboard</option>
-          <option>Monitor</option>
-          <option>Headset</option>
-        </select>
+          <input type="file" onChange={(e) => setImage(e.target.files[0])} style={input}/>
 
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(e) => setImage(e.target.files[0])}
-          style={input}
-        />
+          <button onClick={saveProduct} style={btnGreen} disabled={loading}>
+            {loading ? "กำลังบันทึก..." : editId ? "บันทึก" : "เพิ่มสินค้า"}
+          </button>
+        </div>
 
-        <button onClick={saveProduct} style={addBtn} disabled={loading}>
-          {loading ? "กำลังบันทึก..." : editId ? "บันทึก" : "เพิ่มสินค้า"}
-        </button>
+        {/* COUPON */}
+        <div style={card}>
+          <h2>🎟 สร้างคูปอง</h2>
+
+          <input value={couponCode} onChange={(e) => setCouponCode(e.target.value)} placeholder="CODE เช่น WHY50" style={input}/>
+
+          <select value={couponType} onChange={(e) => setCouponType(e.target.value)} style={input}>
+            <option value="percent">เปอร์เซ็น</option>
+            <option value="fixed">บาท</option>
+          </select>
+
+          <input type="number" value={couponValue} onChange={(e) => setCouponValue(e.target.value)} placeholder="Value" style={input}/>
+
+          <button onClick={createCoupon} style={btnBlue}>
+            สร้างคูปอง
+          </button>
+
+          {couponMsg && <p style={{ marginTop: 10 }}>{couponMsg}</p>}
+        </div>
       </div>
 
-      {/* LIST */}
-      <h2 style={{ marginTop: "40px" }}>สินค้า</h2>
+      {/* PRODUCT LIST */}
+      <h2 style={{ marginTop: 40 }}>สินค้า</h2>
 
       {products.length === 0 ? (
-        <p>❌ ไม่มีสินค้า</p>
+        <p>ไม่มีสินค้า</p>
       ) : (
         products.map((p) => (
-          <div key={p.id} style={card}>
+          <div key={p.id} style={productCard}>
+            <img
+              src={p.image}
+              width={100}
+              onError={(e) =>
+                (e.target.src = "https://via.placeholder.com/100")
+              }
+            />
+
             <div>
-              <img
-                src={p.image}
-                width={120}
-                onError={(e) =>
-                  (e.target.src =
-                    "https://via.placeholder.com/120?text=No+Image")
-                }
-              />
               <p>{p.name}</p>
               <p>{p.price} บาท</p>
             </div>
 
             <div>
               <button onClick={() => handleEdit(p)}>แก้ไข</button>
-              <button
-                onClick={() => deleteProduct(p.id)}
-                style={deleteBtn}
-              >
+              <button onClick={() => deleteProduct(p.id)} style={btnRed}>
                 ลบ
               </button>
             </div>
@@ -242,37 +271,67 @@ function AdminDashboard() {
 }
 
 /* STYLE */
-const formBox = {
+
+const container = {
+  padding: "40px",
+  color: "white",
   background: "#020617",
+  minHeight: "100vh",
+};
+
+const grid = {
+  display: "flex",
+  gap: "30px",
+  flexWrap: "wrap",
+};
+
+const card = {
+  background: "#0f172a",
   padding: "20px",
   borderRadius: "12px",
-  width: "400px",
+  width: "300px",
 };
 
 const input = {
   width: "100%",
   padding: "10px",
   marginBottom: "10px",
+  borderRadius: "6px",
 };
 
-const addBtn = {
-  background: "green",
-  color: "white",
-  padding: "10px",
-};
-
-const deleteBtn = {
-  background: "red",
-  color: "white",
-  padding: "8px",
-};
-
-const card = {
+const productCard = {
   background: "#1e293b",
   padding: "15px",
   marginTop: "10px",
   display: "flex",
   justifyContent: "space-between",
+  alignItems: "center",
+  borderRadius: "10px",
+};
+
+const btnGreen = {
+  background: "#22c55e",
+  color: "white",
+  padding: "10px",
+  width: "100%",
+  borderRadius: "6px",
+  border: "none",
+};
+
+const btnBlue = {
+  background: "#2563eb",
+  color: "white",
+  padding: "10px",
+  width: "100%",
+  borderRadius: "6px",
+  border: "none",
+};
+
+const btnRed = {
+  background: "red",
+  color: "white",
+  padding: "6px",
+  border: "none",
 };
 
 export default AdminDashboard;

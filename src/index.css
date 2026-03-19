@@ -729,3 +729,16 @@ cursor:pointer;
 background:#475569;
 
 }
+.back-btn {
+  background: #64748b;
+  color: white;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.back-btn:hover {
+  background: #475569;
+}

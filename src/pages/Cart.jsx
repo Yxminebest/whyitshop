@@ -5,19 +5,15 @@ import { useNavigate } from "react-router-dom";
 
 function Cart() {
   const { cartItems, removeFromCart, setCartItems } = useContext(CartContext);
-
   const navigate = useNavigate();
 
   const [user, setUser] = useState(null);
-
   const [coupon, setCoupon] = useState("");
   const [discount, setDiscount] = useState(0);
   const [message, setMessage] = useState("");
-
   const [slipFile, setSlipFile] = useState(null);
   const [slipPreview, setSlipPreview] = useState(null);
-
-  const [paymentStatus, setPaymentStatus] = useState("ยังไม่ชำระเงิน");
+  const [loading, setLoading] = useState(false);
 
   const totalPrice = cartItems.reduce(
     (sum, item) => sum + item.price * item.qty,
@@ -26,59 +22,37 @@ function Cart() {
 
   const finalPrice = Math.max(totalPrice - discount, 0);
 
-  /* ================= GET USER ================= */
-
   useEffect(() => {
-    const getUser = async () => {
-      const { data } = await supabase.auth.getUser();
+    supabase.auth.getUser().then(({ data }) => {
       setUser(data?.user || null);
-    };
-
-    getUser();
+    });
   }, []);
 
-  /* ================= COUPON (DB) ================= */
+  /* ================= COUPON ================= */
 
   const applyCoupon = async () => {
-    if (!coupon) {
-      setMessage("กรุณากรอกโค้ด");
+    setMessage("");
+
+    const { data } = await supabase
+      .from("coupons")
+      .select("*")
+      .eq("code", coupon)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (!data) {
+      setDiscount(0);
+      setMessage("❌ คูปองไม่ถูกต้อง");
       return;
     }
 
-    try {
-      const { data, error } = await supabase
-        .from("coupons")
-        .select("*")
-        .eq("code", coupon)
-        .eq("is_active", true)
-        .maybeSingle();
+    const discountValue =
+      data.type === "percent"
+        ? (totalPrice * data.value) / 100
+        : data.value;
 
-      if (error || !data) {
-        setDiscount(0);
-        setMessage("คูปองไม่ถูกต้อง");
-        return;
-      }
-
-      if (data.expires_at && new Date(data.expires_at) < new Date()) {
-        setDiscount(0);
-        setMessage("คูปองหมดอายุ");
-        return;
-      }
-
-      let discountValue = 0;
-
-      if (data.type === "percent") {
-        discountValue = (totalPrice * data.value) / 100;
-      } else {
-        discountValue = data.value;
-      }
-
-      setDiscount(discountValue);
-      setMessage(`ใช้คูปอง ${data.code} สำเร็จ`);
-    } catch (err) {
-      console.log(err);
-      setMessage("เกิดข้อผิดพลาด");
-    }
+    setDiscount(discountValue);
+    setMessage("✅ ใช้คูปองสำเร็จ");
   };
 
   /* ================= SLIP ================= */
@@ -87,237 +61,226 @@ function Cart() {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      alert("อนุญาตเฉพาะไฟล์รูปภาพ");
-      return;
-    }
-
-    if (file.size > 2000000) {
-      alert("ไฟล์ต้องไม่เกิน 2MB");
-      return;
-    }
-
     setSlipFile(file);
     setSlipPreview(URL.createObjectURL(file));
-    setPaymentStatus("แนบสลิปแล้ว (รอตรวจสอบ)");
   };
 
-  /* ================= CONFIRM PAYMENT ================= */
+  /* ================= PAYMENT ================= */
 
   const confirmPayment = async () => {
-    if (!user) {
-      alert("กรุณา login ก่อน");
-      navigate("/login");
-      return;
-    }
+    if (!user) return navigate("/login");
+    if (!slipFile) return alert("แนบสลิปก่อน");
 
-    if (!slipFile) {
-      alert("กรุณาแนบสลิปก่อน");
-      return;
-    }
+    setLoading(true);
 
-    try {
-      const fileName = `${user.id}_${Date.now()}`;
+    const filePath = `slips/${user.id}_${Date.now()}`;
+    await supabase.storage.from("slips").upload(filePath, slipFile);
 
-      // upload slip
-      const { error: uploadError } = await supabase.storage
-        .from("slips")
-        .upload(fileName, slipFile);
+    const { data: urlData } = supabase.storage
+      .from("slips")
+      .getPublicUrl(filePath);
 
-      if (uploadError) {
-        alert(uploadError.message);
-        return;
-      }
-
-      // get url
-      const { data: urlData } = supabase.storage
-        .from("slips")
-        .getPublicUrl(fileName);
-
-      const slipUrl = urlData.publicUrl;
-
-      // insert order
-      const { error } = await supabase.from("orders").insert([
+    const { data: orderData } = await supabase
+      .from("orders")
+      .insert([
         {
-          email: user.email,
-          items: cartItems,
           total_price: finalPrice,
           status: "pending",
-          slip: slipUrl,
+          slip: urlData.publicUrl,
         },
-      ]);
+      ])
+      .select();
 
-      if (error) {
-        alert(error.message);
-        return;
-      }
+    const order = orderData[0];
 
-      // success
-      setPaymentStatus("ชำระเงินแล้ว ✔");
-      setCartItems([]); // 🔥 clear cart
-      alert("สั่งซื้อสำเร็จ");
+    await supabase.from("order_items").insert(
+      cartItems.map((i) => ({
+        order_id: order.id,
+        product_id: i.id,
+        name: i.name,
+        price: i.price,
+        qty: i.qty,
+      }))
+    );
 
-      navigate("/");
-    } catch (err) {
-      alert(err.message);
-    }
+    setCartItems([]);
+    alert("🎉 สำเร็จ!");
+    navigate("/");
   };
 
   /* ================= UI ================= */
 
   return (
-    <div style={{ padding: "40px", color: "white" }}>
-      <h1>🛒 ตะกร้าสินค้า</h1>
+    <div style={container}>
+      <div style={wrapper}>
+        
+        {/* LEFT */}
+        <div style={left}>
+          <h2>🛒 สินค้า</h2>
 
-      {cartItems.length === 0 ? (
-        <p>ยังไม่มีสินค้า</p>
-      ) : (
-        <>
-          {/* PRODUCT LIST */}
-          {cartItems.map((item) => (
-            <div
-              key={item.id}
-              style={{
-                background: "#1e293b",
-                padding: "20px",
-                marginBottom: "15px",
-                borderRadius: "10px",
-              }}
-            >
-              <h3>{item.name}</h3>
-              <p>ราคา: {item.price} บาท</p>
-              <p>จำนวน: {item.qty}</p>
+          {cartItems.length === 0 ? (
+            <p>ยังไม่มีสินค้า</p>
+          ) : (
+            cartItems.map((item) => (
+              <div key={item.id} style={itemCard}>
+                <div>
+                  <h4>{item.name}</h4>
+                  <p>{item.price} บาท x {item.qty}</p>
+                </div>
 
-              <button
-                onClick={() => removeFromCart(item.id)}
-                style={{
-                  background: "red",
-                  color: "white",
-                  padding: "8px 15px",
-                  border: "none",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                }}
-              >
-                ลบสินค้า
-              </button>
-            </div>
-          ))}
+                <button
+                  style={btnRed}
+                  onClick={() => removeFromCart(item.id)}
+                >
+                  ลบ
+                </button>
+              </div>
+            ))
+          )}
+        </div>
 
-          {/* SUMMARY */}
-          <div
-            style={{
-              background: "#020617",
-              padding: "25px",
-              borderRadius: "12px",
-              marginTop: "30px",
-              width: "420px",
-            }}
-          >
-            <h2>💰 สรุปรายการ</h2>
+        {/* RIGHT */}
+        <div style={right}>
+          <h2>💳 สรุป</h2>
 
-            <p>ราคารวม: {totalPrice} บาท</p>
-            <p>ส่วนลด: {discount} บาท</p>
-
-            <h2 style={{ color: "#22c55e" }}>
-              ราคาสุทธิ: {finalPrice} บาท
-            </h2>
-
-            {/* COUPON */}
-            <h3 style={{ marginTop: "20px" }}>🎟 คูปอง</h3>
-
-            <input
-              type="text"
-              placeholder="เช่น WHY10"
-              value={coupon}
-              onChange={(e) =>
-                setCoupon(e.target.value.toUpperCase())
-              }
-              style={{
-                padding: "10px",
-                width: "100%",
-                marginBottom: "10px",
-                borderRadius: "8px",
-                border: "none",
-              }}
-            />
-
-            <button
-              onClick={applyCoupon}
-              style={{
-                background: "#22c55e",
-                color: "white",
-                padding: "10px",
-                border: "none",
-                borderRadius: "8px",
-                width: "100%",
-              }}
-            >
-              ใช้คูปอง
-            </button>
-
-            {message && <p style={{ marginTop: "10px" }}>{message}</p>}
-
-            {/* PAYMENT */}
-            <h3 style={{ marginTop: "30px" }}>💳 ช่องทางการชำระเงิน</h3>
-
-            <div
-              style={{
-                background: "#1e293b",
-                padding: "15px",
-                borderRadius: "10px",
-                marginTop: "10px",
-              }}
-            >
-              <p>ธนาคารกสิกรไทย</p>
-              <p>เลขบัญชี: 123-4-56789-0</p>
-              <p>ชื่อบัญชี: WHY IT SHOP</p>
-            </div>
-
-            {/* SLIP */}
-            <h3 style={{ marginTop: "25px" }}>📄 แนบสลิป</h3>
-
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleSlipUpload}
-            />
-
-            {slipPreview && (
-              <img
-                src={slipPreview}
-                alt="slip"
-                style={{
-                  width: "200px",
-                  marginTop: "10px",
-                  borderRadius: "10px",
-                }}
-              />
-            )}
-
-            <p style={{ marginTop: "10px" }}>
-              สถานะ: {paymentStatus}
-            </p>
-
-            <button
-              onClick={confirmPayment}
-              style={{
-                background: "#2563eb",
-                color: "white",
-                padding: "12px",
-                border: "none",
-                borderRadius: "8px",
-                width: "100%",
-                marginTop: "10px",
-              }}
-            >
-              ยืนยันการชำระเงิน
-            </button>
+          <div style={row}>
+            <span>รวม</span>
+            <span>{totalPrice} บาท</span>
           </div>
-        </>
-      )}
+
+          <div style={row}>
+            <span>ส่วนลด</span>
+            <span>-{discount} บาท</span>
+          </div>
+
+          <div style={total}>
+            <span>สุทธิ</span>
+            <span>{finalPrice} บาท</span>
+          </div>
+
+          <input
+            placeholder="ใส่คูปอง"
+            value={coupon}
+            onChange={(e) => setCoupon(e.target.value)}
+            style={input}
+          />
+
+          <button onClick={applyCoupon} style={btnGreen}>
+            ใช้คูปอง
+          </button>
+
+          {message && <p>{message}</p>}
+
+          <input type="file" onChange={handleSlipUpload} />
+
+          {slipPreview && (
+            <img src={slipPreview} style={preview} />
+          )}
+
+          <button
+            onClick={confirmPayment}
+            style={btnBlue}
+            disabled={loading}
+          >
+            {loading ? "กำลังบันทึก..." : "ยืนยันการชำระเงิน"}
+          </button>
+        </div>
+
+      </div>
     </div>
   );
 }
+
+/* ================= STYLE ================= */
+
+const container = {
+  padding: "20px",
+  background: "#020617",
+  minHeight: "100vh",
+  color: "white",
+};
+
+const wrapper = {
+  display: "grid",
+  gridTemplateColumns: "2fr 1fr",
+  gap: "20px",
+
+  // 🔥 Responsive
+  "@media (max-width: 768px)": {
+    gridTemplateColumns: "1fr",
+  },
+};
+
+const left = {
+  background: "#0f172a",
+  padding: "20px",
+  borderRadius: "12px",
+};
+
+const right = {
+  background: "#0f172a",
+  padding: "20px",
+  borderRadius: "12px",
+};
+
+const itemCard = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  background: "#1e293b",
+  padding: "15px",
+  marginTop: "10px",
+  borderRadius: "10px",
+};
+
+const row = {
+  display: "flex",
+  justifyContent: "space-between",
+  marginTop: "10px",
+};
+
+const total = {
+  display: "flex",
+  justifyContent: "space-between",
+  marginTop: "15px",
+  fontSize: "18px",
+  color: "#22c55e",
+};
+
+const input = {
+  width: "100%",
+  padding: "10px",
+  marginTop: "10px",
+  borderRadius: "8px",
+};
+
+const preview = {
+  width: "100%",
+  marginTop: "10px",
+  borderRadius: "10px",
+};
+
+const btnGreen = {
+  width: "100%",
+  marginTop: "10px",
+  padding: "10px",
+  background: "#22c55e",
+  borderRadius: "8px",
+};
+
+const btnBlue = {
+  width: "100%",
+  marginTop: "10px",
+  padding: "12px",
+  background: "#2563eb",
+  borderRadius: "8px",
+};
+
+const btnRed = {
+  background: "red",
+  color: "white",
+  padding: "6px 10px",
+  borderRadius: "6px",
+};
 
 export default Cart;

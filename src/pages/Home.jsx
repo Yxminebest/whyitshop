@@ -21,7 +21,7 @@ function Home() {
     if (error) {
       console.error("Error fetching products:", error.message);
     } else {
-      setProducts(data);
+      setProducts(data || []);
     }
   };
 
@@ -73,7 +73,7 @@ function Home() {
                 }
                 alt={item.name}
               />
-              <span className="sale-badge">SALE</span>
+              {/* ❌ ลบ SALE ออกแล้ว */}
             </div>
 
             <div className="product-info">

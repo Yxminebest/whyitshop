@@ -1,137 +1,139 @@
-import { useEffect, useState } from "react"
-import { supabase } from "../lib/supabase"
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabase";
+import { useNavigate } from "react-router-dom";
 
 function Profile() {
 
-  const [user,setUser] = useState(null)
+  const navigate = useNavigate(); // 🔥 เพิ่ม
 
-  const [username,setUsername] = useState("")
-  const [firstname,setFirstname] = useState("")
-  const [lastname,setLastname] = useState("")
-  const [phone,setPhone] = useState("")
-  const [address,setAddress] = useState("")
+  const [user,setUser] = useState(null);
 
-  const [avatar,setAvatar] = useState(null)
-  const [preview,setPreview] = useState(null)
+  const [username,setUsername] = useState("");
+  const [firstname,setFirstname] = useState("");
+  const [lastname,setLastname] = useState("");
+  const [phone,setPhone] = useState("");
+  const [address,setAddress] = useState("");
 
-  const [loading,setLoading] = useState(false)
+  const [avatar,setAvatar] = useState(null);
+  const [preview,setPreview] = useState(null);
+
+  const [loading,setLoading] = useState(false);
 
   /* ================= GET USER ================= */
 
   useEffect(()=>{
-    getUser()
-  },[])
+    getUser();
+  },[]);
 
   const getUser = async ()=>{
-    const { data } = await supabase.auth.getUser()
+    const { data } = await supabase.auth.getUser();
 
     if(data?.user){
-      setUser(data.user)
-      loadProfile(data.user.id)
+      setUser(data.user);
+      loadProfile(data.user.id);
     }
-  }
+  };
 
   /* ================= LOAD PROFILE ================= */
 
   const loadProfile = async(userId)=>{
 
     const { data, error } = await supabase
-    .from("users")
-    .select("*")
-    .eq("id",userId)
-    .single()
+      .from("users")
+      .select("*")
+      .eq("id",userId)
+      .maybeSingle(); // 🔥 แก้จาก single
 
     if(error){
-      console.log(error)
+      console.log(error);
     }else if(data){
-      setUsername(data.username || "")
-      setFirstname(data.firstname || "")
-      setLastname(data.lastname || "")
-      setPhone(data.phone || "")
-      setAddress(data.address || "")
-      setPreview(data.avatar || null) // 🔥 โหลดรูป
+      setUsername(data.username || "");
+      setFirstname(data.firstname || "");
+      setLastname(data.lastname || "");
+      setPhone(data.phone || "");
+      setAddress(data.address || "");
+      setPreview(data.avatar || null);
     }
-  }
+  };
 
   /* ================= UPLOAD AVATAR ================= */
 
   const handleUpload = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
+    const file = e.target.files[0];
+    if (!file) return;
 
-    // validate
     if (!file.type.startsWith("image/")) {
-      alert("ต้องเป็นรูปภาพเท่านั้น")
-      return
+      alert("ต้องเป็นรูปภาพเท่านั้น");
+      return;
     }
 
     if (file.size > 2000000) {
-      alert("ไฟล์ต้องไม่เกิน 2MB")
-      return
+      alert("ไฟล์ต้องไม่เกิน 2MB");
+      return;
     }
 
     try {
 
-      const fileName = user.id + "_" + Date.now()
+      const fileName = `${user.id}_${Date.now()}`;
 
       const { error } = await supabase.storage
         .from("avatars")
-        .upload(fileName, file)
+        .upload(fileName, file);
 
       if (error) {
-        console.log(error)
-        alert("อัปโหลดไม่สำเร็จ")
-        return
+        console.log(error);
+        alert("อัปโหลดไม่สำเร็จ");
+        return;
       }
 
       const { data } = supabase.storage
         .from("avatars")
-        .getPublicUrl(fileName)
+        .getPublicUrl(fileName);
 
-      setAvatar(data.publicUrl)
-      setPreview(data.publicUrl)
+      setAvatar(data.publicUrl);
+      setPreview(data.publicUrl);
 
     } catch (err) {
-      console.log(err)
+      console.log(err);
     }
-  }
+  };
 
   /* ================= SAVE PROFILE ================= */
 
   const saveProfile = async ()=>{
 
-    if(!user) return
+    if(!user) return;
 
     try{
 
-      setLoading(true)
+      setLoading(true);
 
       const { error } = await supabase
-      .from("users")
-      .upsert({
-        id:user.id,
-        email:user.email,
-        username,
-        firstname,
-        lastname,
-        phone,
-        address,
-        avatar: avatar || preview // 🔥 บันทึกรูป
-      })
+        .from("users")
+        .upsert({
+          id:user.id,
+          email:user.email,
+          username,
+          firstname,
+          lastname,
+          phone,
+          address,
+          avatar: avatar || preview
+        });
 
       if(error){
-        console.log(error)
-        alert("บันทึกไม่สำเร็จ")
+        console.log(error);
+        alert("บันทึกไม่สำเร็จ");
       }else{
-        alert("บันทึกข้อมูลแล้ว")
+        alert("บันทึกข้อมูลแล้ว");
       }
 
     }catch(err){
-      console.log(err)
+      console.log(err);
     }
 
-    setLoading(false)
-  }
+    setLoading(false);
+  };
 
   /* ================= UI ================= */
 
@@ -207,19 +209,32 @@ function Profile() {
 
       </div>
 
-      <button
-        className="profile-btn"
-        onClick={saveProfile}
-        disabled={loading}
-      >
-        {loading ? "Saving..." : "Submit"}
-      </button>
+      {/* 🔥 ปุ่ม */}
+      <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "10px" }}>
+
+        <button
+          className="profile-btn"
+          onClick={saveProfile}
+          disabled={loading}
+        >
+          {loading ? "Saving..." : "Submit"}
+        </button>
+
+        {/* 🔥 ปุ่มกลับหน้าแรก */}
+        <button
+          className="back-btn"
+          onClick={() => navigate("/")}
+        >
+          ⬅ กลับหน้าแรก
+        </button>
+
+      </div>
 
     </div>
 
   </div>
 
-  )
+  );
 }
 
-export default Profile
+export default Profile;

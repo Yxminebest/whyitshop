@@ -13,6 +13,8 @@ import AdminDashboard from "./pages/AdminDashboard";
 import Profile from "./pages/Profile";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import AdminUsers from "./pages/AdminUsers";
+import Coupons from "./pages/Coupons";
 
 function App() {
   return (
@@ -33,6 +35,7 @@ function App() {
           <Route path="/products" element={<Products />} />
           <Route path="/product/:id" element={<ProductDetail />} />
           <Route path="/cart" element={<Cart />} />
+          <Route path="/coupons" element={<Coupons />} />
 
           {/* ================= AUTH ================= */}
           <Route path="/login" element={<Login />} />
@@ -49,6 +52,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute>
+                <AdminUsers />
               </ProtectedRoute>
             }
           />

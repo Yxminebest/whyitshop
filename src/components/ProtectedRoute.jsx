@@ -9,7 +9,7 @@ function ProtectedRoute({ children }) {
   useEffect(() => {
     const checkUser = async () => {
       try {
-        // 🔐 ดึง user จาก session
+        // 🔐 1. เช็ค login
         const { data } = await supabase.auth.getUser();
 
         if (!data?.user) {
@@ -17,7 +17,7 @@ function ProtectedRoute({ children }) {
           return;
         }
 
-        // 🔐 เช็ค role จาก database
+        // 🔐 2. เช็ค role จาก DB
         const { data: userData, error } = await supabase
           .from("users")
           .select("role")
@@ -25,15 +25,15 @@ function ProtectedRoute({ children }) {
           .single();
 
         if (error || userData?.role !== "admin") {
-          navigate("/");
+          navigate("/"); // ไม่ใช่ admin → กลับหน้า home
           return;
         }
 
-        // ✅ ผ่านทุกเงื่อนไข
+        // ✅ ผ่าน → แสดงหน้าได้
         setLoading(false);
 
       } catch (err) {
-        console.log(err);
+        console.error(err);
         navigate("/login");
       }
     };
@@ -41,6 +41,7 @@ function ProtectedRoute({ children }) {
     checkUser();
   }, [navigate]);
 
+  // ⏳ ระหว่างโหลด
   if (loading) {
     return (
       <p style={{ color: "white", padding: "40px" }}>
@@ -49,6 +50,7 @@ function ProtectedRoute({ children }) {
     );
   }
 
+  // ✅ ผ่านแล้ว
   return children;
 }
 

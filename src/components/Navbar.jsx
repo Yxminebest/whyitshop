@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useContext, useEffect, useState } from "react";
 import { CartContext } from "../context/CartContext";
 import { supabase } from "../lib/supabase";
@@ -8,8 +8,6 @@ function Navbar() {
 
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
-
-  const navigate = useNavigate();
 
   /* ================= CART COUNT ================= */
 
@@ -33,7 +31,6 @@ function Navbar() {
   /* ================= AUTH ================= */
 
   useEffect(() => {
-    // 🔥 โหลด session ครั้งแรก
     supabase.auth.getSession().then(({ data }) => {
       if (data?.session?.user) {
         setUser(data.session.user);
@@ -41,7 +38,6 @@ function Navbar() {
       }
     });
 
-    // 🔥 realtime listener
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         if (session?.user) {
@@ -62,42 +58,24 @@ function Navbar() {
   /* ================= LOGOUT ================= */
 
   const logoutUser = async () => {
-    console.log("CLICK LOGOUT");
-
-    try {
-      await supabase.auth.signOut();
-
-      // 🔥 ล้าง session ฝั่ง browser
-      localStorage.clear();
-      sessionStorage.clear();
-
-      // 🔥 redirect แบบ force (สำคัญมาก)
-      window.location.replace("/login");
-
-    } catch (err) {
-      console.log("LOGOUT ERROR:", err);
-    }
+    await supabase.auth.signOut();
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.replace("/login");
   };
 
   /* ================= UI ================= */
 
   return (
-    <nav
-      style={{
-        background: "#020617",
-        padding: "15px 40px",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        color: "white",
-      }}
-    >
-      <h2>💻 WHY IT Shop</h2>
+    <nav style={nav}>
+      <h2 style={{ fontWeight: "bold" }}>💻 WHY IT Shop</h2>
 
-      <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
+      <div style={menu}>
         <Link to="/" style={link}>Home</Link>
-
         <Link to="/products" style={link}>Products</Link>
+
+        {/* 🔥 เพิ่ม Coupons ตรงนี้ */}
+        <Link to="/coupons" style={link}>Coupons</Link>
 
         <Link to="/cart" style={link}>
           Cart 🛒 ({totalQty})
@@ -109,15 +87,22 @@ function Navbar() {
           </Link>
         )}
 
+        {/* 🔐 ADMIN */}
         {role === "admin" && (
-          <Link to="/admin" style={link}>
-            Admin
-          </Link>
+          <>
+            <Link to="/admin" style={link}>
+              Admin
+            </Link>
+            <Link to="/admin/users" style={link}>
+              Manage Users
+            </Link>
+          </>
         )}
 
+        {/* USER INFO */}
         {user ? (
           <>
-            <span style={{ fontSize: "14px" }}>
+            <span style={userText}>
               {user.user_metadata?.full_name || user.email}
             </span>
 
@@ -137,10 +122,32 @@ function Navbar() {
 
 /* ================= STYLE ================= */
 
+const nav = {
+  background: "#020617",
+  padding: "15px 40px",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  color: "white",
+  boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+};
+
+const menu = {
+  display: "flex",
+  gap: "20px",
+  alignItems: "center",
+};
+
 const link = {
   color: "white",
   textDecoration: "none",
   fontWeight: "bold",
+  transition: "0.2s",
+};
+
+const userText = {
+  fontSize: "13px",
+  opacity: 0.7,
 };
 
 const logoutBtn = {
@@ -150,6 +157,7 @@ const logoutBtn = {
   padding: "6px 12px",
   borderRadius: "6px",
   cursor: "pointer",
+  transition: "0.2s",
 };
 
 export default Navbar;
