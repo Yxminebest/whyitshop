@@ -9,6 +9,7 @@ function AdminDashboard() {
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("");
   const [image, setImage] = useState(null);
+  const [description, setDescription] = useState(""); // ✅ NEW
 
   const [editId, setEditId] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -35,7 +36,7 @@ function AdminDashboard() {
 
   /* ================= SAVE PRODUCT ================= */
   const saveProduct = async () => {
-    if (!name || !price || !category) {
+    if (!name || !price || !category || !description) { // ✅ แก้
       alert("กรอกข้อมูลให้ครบ");
       return;
     }
@@ -57,7 +58,7 @@ function AdminDashboard() {
         const { error: uploadError } = await supabase.storage
           .from("product-images")
           .upload(fileName, image, {
-            contentType: image.type, // 🔥 FIX สำคัญ
+            contentType: image.type,
           });
 
         if (uploadError) {
@@ -82,6 +83,7 @@ function AdminDashboard() {
             name: safeName,
             price: Number(price),
             category,
+            description, // ✅ NEW
             ...(imageUrl && { image: imageUrl }),
           })
           .eq("id", editId);
@@ -110,6 +112,7 @@ function AdminDashboard() {
             price: Number(price),
             category,
             image: imageUrl,
+            description, // ✅ NEW
           },
         ]);
 
@@ -126,6 +129,7 @@ function AdminDashboard() {
       setPrice("");
       setCategory("");
       setImage(null);
+      setDescription(""); // ✅ NEW
 
       await fetchProducts();
     } catch (err) {
@@ -154,6 +158,7 @@ function AdminDashboard() {
     setName(item.name);
     setPrice(item.price);
     setCategory(item.category);
+    setDescription(item.description || ""); // ✅ NEW
   };
 
   /* ================= CREATE COUPON ================= */
@@ -208,6 +213,14 @@ function AdminDashboard() {
             <option>Headset</option>
           </select>
 
+          {/* ✅ NEW DESCRIPTION */}
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="รายละเอียดสินค้า"
+            style={{ ...input, height: "100px" }}
+          />
+
           <input type="file" onChange={(e) => setImage(e.target.files[0])} style={input}/>
 
           <button onClick={saveProduct} style={btnGreen} disabled={loading}>
@@ -255,6 +268,11 @@ function AdminDashboard() {
             <div>
               <p>{p.name}</p>
               <p>{p.price} บาท</p>
+
+              {/* ✅ NEW */}
+              <p style={{ fontSize: "12px", color: "#94a3b8" }}>
+                {p.description?.slice(0, 50)}...
+              </p>
             </div>
 
             <div>
@@ -270,7 +288,7 @@ function AdminDashboard() {
   );
 }
 
-/* STYLE */
+/* STYLE เหมือนเดิม */
 
 const container = {
   padding: "40px",

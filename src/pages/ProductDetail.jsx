@@ -6,18 +6,15 @@ import { CartContext } from "../context/CartContext";
 function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-
   const { addToCart } = useContext(CartContext);
 
   const [product, setProduct] = useState(null);
   const [related, setRelated] = useState([]);
-
   const [loading, setLoading] = useState(true);
   const [qty, setQty] = useState(1);
   const [message, setMessage] = useState("");
 
   /* ================= LOAD ================= */
-
   useEffect(() => {
     fetchProduct();
   }, [id]);
@@ -42,7 +39,6 @@ function ProductDetail() {
   };
 
   /* ================= RELATED ================= */
-
   const fetchRelated = async (currentProduct) => {
     const { data } = await supabase
       .from("products")
@@ -55,8 +51,9 @@ function ProductDetail() {
   };
 
   /* ================= ADD TO CART ================= */
-
   const handleAddToCart = () => {
+    if (qty < 1) return;
+
     for (let i = 0; i < qty; i++) {
       addToCart(product);
     }
@@ -69,7 +66,6 @@ function ProductDetail() {
   };
 
   /* ================= LOADING ================= */
-
   if (loading) {
     return (
       <div style={{ padding: "40px", color: "white" }}>
@@ -87,62 +83,65 @@ function ProductDetail() {
   }
 
   /* ================= UI ================= */
-
   return (
     <div style={{ padding: "40px", color: "white" }}>
-      {/* BACK BUTTON */}
+      {/* BACK */}
       <button onClick={() => navigate(-1)} style={backBtn}>
         ⬅ กลับ
       </button>
 
+      {/* MAIN */}
       <div style={container}>
-        {/* IMAGE */}
         <img
           src={product.image || "https://via.placeholder.com/400"}
           alt={product.name}
           style={image}
         />
 
-        {/* INFO */}
         <div style={info}>
           <h1>{product.name}</h1>
 
-          <p style={{ fontSize: "18px", marginTop: "10px" }}>
-            หมวดหมู่: {product.category}
+          <p style={{ marginTop: 10 }}>
+            หมวดหมู่: <b>{product.category}</b>
           </p>
 
-          <h2 style={{ color: "#22c55e", marginTop: "20px" }}>
+          <h2 style={{ color: "#22c55e", marginTop: 20 }}>
             {product.price} บาท
           </h2>
 
-          {/* QUANTITY */}
-          <div style={{ marginTop: "20px" }}>
+          {/* 🔥 DESCRIPTION */}
+          <div style={descBox}>
+            <h3>รายละเอียดสินค้า</h3>
+            <p style={descText}>
+              {product.description || "ไม่มีรายละเอียดสินค้า"}
+            </p>
+          </div>
+
+          {/* QTY */}
+          <div style={{ marginTop: 20 }}>
             <span>จำนวน: </span>
             <input
               type="number"
               min="1"
               value={qty}
-              onChange={(e) => setQty(Number(e.target.value))}
+              onChange={(e) =>
+                setQty(Math.max(1, Number(e.target.value)))
+              }
               style={qtyInput}
             />
           </div>
 
-          {/* BUTTON */}
+          {/* BTN */}
           <button onClick={handleAddToCart} style={button}>
             🛒 เพิ่มลงตะกร้า
           </button>
 
-          {/* MESSAGE */}
-          {message && (
-            <p style={{ color: "#22c55e", marginTop: "10px" }}>
-              {message}
-            </p>
-          )}
+          {message && <p style={successMsg}>{message}</p>}
         </div>
       </div>
 
-      {/* RELATED PRODUCTS */}
-      <h2 style={{ marginTop: "50px" }}>🔥 สินค้าใกล้เคียง</h2>
+      {/* RELATED */}
+      <h2 style={{ marginTop: 50 }}>🔥 สินค้าใกล้เคียง</h2>
 
       <div style={grid}>
         {related.length === 0 ? (
@@ -154,12 +153,7 @@ function ProductDetail() {
               style={card}
               onClick={() => navigate(`/product/${item.id}`)}
             >
-              <img
-                src={item.image}
-                style={relatedImg}
-                alt=""
-              />
-
+              <img src={item.image} style={relatedImg} alt="" />
               <h4>{item.name}</h4>
               <p>{item.price} บาท</p>
             </div>
@@ -178,7 +172,7 @@ const container = {
   background: "#1e293b",
   padding: "30px",
   borderRadius: "12px",
-  alignItems: "center",
+  alignItems: "flex-start",
 };
 
 const image = {
@@ -190,6 +184,19 @@ const info = {
   flex: 1,
 };
 
+const descBox = {
+  marginTop: "20px",
+  background: "#0f172a",
+  padding: "15px",
+  borderRadius: "10px",
+};
+
+const descText = {
+  marginTop: "10px",
+  lineHeight: "1.6",
+  color: "#cbd5f5",
+};
+
 const button = {
   marginTop: "20px",
   background: "#22c55e",
@@ -198,7 +205,11 @@ const button = {
   border: "none",
   borderRadius: "8px",
   cursor: "pointer",
-  fontSize: "16px",
+};
+
+const successMsg = {
+  color: "#22c55e",
+  marginTop: "10px",
 };
 
 const qtyInput = {
