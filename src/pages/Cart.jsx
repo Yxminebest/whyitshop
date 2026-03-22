@@ -20,7 +20,7 @@ function Cart() {
 
   /* ================= CALCULATE ================= */
   const totalPrice = cartItems.reduce(
-    (sum, item) => sum + item.price * item.qty,
+    (sum, item) => sum + item.price * (item.qty || 1),
     0
   );
 
@@ -63,13 +63,12 @@ function Cart() {
   };
 
   /* ================= SLIP ================= */
-  const handleSlipUpload = async (e) => {
+  const handleSlipUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // 🔥 กันตั้งแต่เลือกไฟล์ (สำคัญ)
     if (!user) {
-      alert("กรุณาเข้าสู่ระบบก่อนอัปโหลด ❌");
+      alert("กรุณาเข้าสู่ระบบก่อน");
       navigate("/login");
       return;
     }
@@ -78,12 +77,16 @@ function Cart() {
     setSlipPreview(URL.createObjectURL(file));
   };
 
-  /* ================= PAYMENT ================= */
+  /* ================= CHECKOUT ================= */
   const confirmPayment = async () => {
-    // 🔥 เช็ค login ซ้ำ (กัน 2 ชั้น)
     if (!user) {
       alert("กรุณาเข้าสู่ระบบก่อน");
       return navigate("/login");
+    }
+
+    if (cartItems.length === 0) {
+      alert("ไม่มีสินค้าในตะกร้า");
+      return;
     }
 
     if (!slipFile) {
@@ -94,58 +97,73 @@ function Cart() {
     try {
       setLoading(true);
 
-      /* 🔥 path = user.id (ตรงกับ policy) */
+      /* ================= UPLOAD SLIP ================= */
       const filePath = `${user.id}/${Date.now()}_${slipFile.name}`;
 
-      /* 🔥 upload */
       const { error: uploadError } = await supabase.storage
         .from("slips")
         .upload(filePath, slipFile);
 
       if (uploadError) {
-        console.error(uploadError);
-        alert("อัปโหลดไม่สำเร็จ ❌");
+        console.error("Upload error:", uploadError);
+        alert("❌ อัปโหลดสลิปไม่สำเร็จ");
         return;
       }
 
-      /* 🔥 insert order */
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("slips").getPublicUrl(filePath);
+
+      /* ================= INSERT ORDER ================= */
       const { data: orderData, error: orderError } = await supabase
         .from("orders")
         .insert([
           {
+            user_id: user.id,
             total_price: finalPrice,
             status: "pending",
-            slip: filePath,
-            user_id: user.id,
+            slip_url: publicUrl,
           },
         ])
-        .select();
+        .select()
+        .single();
 
-      if (orderError) throw orderError;
+      if (orderError) {
+        console.error("Order error:", orderError);
+        alert("❌ บันทึกออเดอร์ไม่สำเร็จ");
+        return;
+      }
 
-      const order = orderData[0];
+      console.log("ORDER CREATED:", orderData);
 
-      /* 🔥 insert order items */
-      const { error: itemError } = await supabase
+      /* ================= INSERT ORDER ITEMS ================= */
+      const orderItems = cartItems.map((item) => ({
+        order_id: orderData.id,
+        product_id: item.id,
+        quantity: item.qty || 1, // ✅ ใช้ quantity แล้ว
+        price: item.price,
+      }));
+
+      const { error: itemsError } = await supabase
         .from("order_items")
-        .insert(
-          cartItems.map((i) => ({
-            order_id: order.id,
-            product_id: i.id,
-            name: i.name,
-            price: i.price,
-            qty: i.qty,
-          }))
-        );
+        .insert(orderItems);
 
-      if (itemError) throw itemError;
+      if (itemsError) {
+        console.error("Items error:", itemsError);
+        alert("❌ บันทึกรายการสินค้าไม่สำเร็จ");
+        return;
+      }
+
+      /* ================= SUCCESS ================= */
+      alert("🎉 สั่งซื้อสำเร็จ");
 
       setCartItems([]);
-      alert("🎉 ชำระเงินสำเร็จ");
-      navigate("/");
+      localStorage.removeItem("cart");
+
+      navigate("/my-orders");
 
     } catch (err) {
-      console.error(err);
+      console.error("Checkout error:", err);
       alert("เกิดข้อผิดพลาด");
     } finally {
       setLoading(false);
@@ -167,7 +185,9 @@ function Cart() {
               <div key={item.id} style={itemCard}>
                 <div>
                   <h4>{item.name}</h4>
-                  <p>{item.price} บาท x {item.qty}</p>
+                  <p>
+                    {item.price} บาท x {item.qty}
+                  </p>
                 </div>
 
                 <button
@@ -302,6 +322,8 @@ const btnGreen = {
   padding: "10px",
   background: "#22c55e",
   borderRadius: "8px",
+  border: "none",
+  cursor: "pointer",
 };
 
 const btnBlue = {
@@ -310,13 +332,17 @@ const btnBlue = {
   padding: "12px",
   background: "#2563eb",
   borderRadius: "8px",
+  border: "none",
+  cursor: "pointer",
 };
 
 const btnRed = {
-  background: "red",
+  background: "#ef4444",
   color: "white",
   padding: "6px 10px",
   borderRadius: "6px",
+  border: "none",
+  cursor: "pointer",
 };
 
 export default Cart;
