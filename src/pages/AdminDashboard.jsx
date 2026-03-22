@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { sanitizeInput } from "../utils/sanitize";
+import { useNavigate } from "react-router-dom";
 
 function AdminDashboard() {
+  const navigate = useNavigate();
+
+  /* ================= STATE ================= */
   const [products, setProducts] = useState([]);
 
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("");
   const [image, setImage] = useState(null);
-  const [description, setDescription] = useState(""); // ✅ NEW
+  const [description, setDescription] = useState("");
 
   const [editId, setEditId] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -20,15 +24,40 @@ function AdminDashboard() {
   const [couponValue, setCouponValue] = useState("");
   const [couponMsg, setCouponMsg] = useState("");
 
+  /* ================= CHECK ADMIN ================= */
   useEffect(() => {
+    checkAdmin();
     fetchProducts();
   }, []);
 
+  const checkAdmin = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    const { data } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (data?.role !== "admin") {
+      alert("คุณไม่มีสิทธิ์เข้า Admin ❌");
+      navigate("/");
+    }
+  };
+
+  /* ================= FETCH ================= */
   const fetchProducts = async () => {
     const { data, error } = await supabase.from("products").select("*");
 
     if (error) {
-      console.log("❌ fetch error:", error);
+      console.error("Fetch error:", error);
     } else {
       setProducts(data || []);
     }
@@ -36,7 +65,7 @@ function AdminDashboard() {
 
   /* ================= SAVE PRODUCT ================= */
   const saveProduct = async () => {
-    if (!name || !price || !category || !description) { // ✅ แก้
+    if (!name || !price || !category || !description) {
       alert("กรอกข้อมูลให้ครบ");
       return;
     }
@@ -47,7 +76,7 @@ function AdminDashboard() {
       const safeName = sanitizeInput(name);
       let imageUrl = null;
 
-      /* ===== UPLOAD ===== */
+      /* UPLOAD IMAGE */
       if (image) {
         const cleanName = image.name
           .replace(/\s+/g, "_")
@@ -62,9 +91,7 @@ function AdminDashboard() {
           });
 
         if (uploadError) {
-          console.log("UPLOAD ERROR:", uploadError);
           alert("❌ อัปโหลดรูปไม่สำเร็จ");
-          setLoading(false);
           return;
         }
 
@@ -75,81 +102,58 @@ function AdminDashboard() {
         imageUrl = data.publicUrl;
       }
 
-      /* ===== UPDATE ===== */
+      /* UPDATE */
       if (editId) {
-        const { error } = await supabase
+        await supabase
           .from("products")
           .update({
             name: safeName,
             price: Number(price),
             category,
-            description, // ✅ NEW
+            description,
             ...(imageUrl && { image: imageUrl }),
           })
           .eq("id", editId);
 
-        if (error) {
-          console.log(error);
-          alert("❌ แก้ไขไม่สำเร็จ");
-        } else {
-          alert("✅ แก้ไขสินค้าแล้ว");
-        }
-
+        alert("✅ แก้ไขสินค้าแล้ว");
         setEditId(null);
       }
 
-      /* ===== INSERT ===== */
+      /* INSERT */
       else {
         if (!imageUrl) {
           alert("ต้องใส่รูป");
-          setLoading(false);
           return;
         }
 
-        const { error } = await supabase.from("products").insert([
+        await supabase.from("products").insert([
           {
             name: safeName,
             price: Number(price),
             category,
             image: imageUrl,
-            description, // ✅ NEW
+            description,
           },
         ]);
 
-        if (error) {
-          console.log(error);
-          alert("❌ เพิ่มสินค้าไม่สำเร็จ");
-        } else {
-          alert("✅ เพิ่มสินค้าแล้ว");
-        }
+        alert("✅ เพิ่มสินค้าแล้ว");
       }
 
-      /* RESET */
-      setName("");
-      setPrice("");
-      setCategory("");
-      setImage(null);
-      setDescription(""); // ✅ NEW
-
-      await fetchProducts();
+      resetForm();
+      fetchProducts();
     } catch (err) {
-      console.log("ERROR:", err);
+      console.error("Save error:", err);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   /* ================= DELETE ================= */
   const deleteProduct = async (id) => {
     if (!confirm("ยืนยันการลบ?")) return;
 
-    const { error } = await supabase.from("products").delete().eq("id", id);
-
-    if (error) {
-      alert("ลบไม่สำเร็จ");
-    } else {
-      fetchProducts();
-    }
+    await supabase.from("products").delete().eq("id", id);
+    fetchProducts();
   };
 
   /* ================= EDIT ================= */
@@ -158,52 +162,55 @@ function AdminDashboard() {
     setName(item.name);
     setPrice(item.price);
     setCategory(item.category);
-    setDescription(item.description || ""); // ✅ NEW
+    setDescription(item.description || "");
   };
 
-  /* ================= CREATE COUPON ================= */
+  /* ================= RESET ================= */
+  const resetForm = () => {
+    setName("");
+    setPrice("");
+    setCategory("");
+    setImage(null);
+    setDescription("");
+  };
+
+  /* ================= COUPON ================= */
   const createCoupon = async () => {
     if (!couponCode || !couponValue) {
       setCouponMsg("❌ กรอกข้อมูลให้ครบ");
       return;
     }
 
-    try {
-      const { error } = await supabase.from("coupons").insert([
-        {
-          code: couponCode.toUpperCase(),
-          type: couponType,
-          value: Number(couponValue),
-          is_active: true,
-        },
-      ]);
+    const { error } = await supabase.from("coupons").insert([
+      {
+        code: couponCode.toUpperCase(),
+        type: couponType,
+        value: Number(couponValue),
+        is_active: true,
+      },
+    ]);
 
-      if (error) {
-        console.log(error);
-        setCouponMsg("❌ สร้างไม่สำเร็จ");
-      } else {
-        setCouponMsg("✅ สร้างคูปองสำเร็จ");
-        setCouponCode("");
-        setCouponValue("");
-      }
-    } catch (err) {
-      console.log(err);
+    if (error) {
+      setCouponMsg("❌ สร้างไม่สำเร็จ");
+    } else {
+      setCouponMsg("✅ สร้างคูปองสำเร็จ");
+      setCouponCode("");
+      setCouponValue("");
     }
   };
 
   /* ================= UI ================= */
-
   return (
     <div style={container}>
-      <h1 style={{ marginBottom: 20 }}>🛠 Admin Dashboard</h1>
+      <h1>🛠 Admin Dashboard</h1>
 
       <div style={grid}>
         {/* PRODUCT */}
         <div style={card}>
           <h2>📦 เพิ่มสินค้า</h2>
 
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="ชื่อสินค้า" style={input}/>
-          <input value={price} onChange={(e) => setPrice(e.target.value)} type="number" placeholder="ราคา" style={input}/>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="ชื่อสินค้า" style={input} />
+          <input value={price} onChange={(e) => setPrice(e.target.value)} type="number" placeholder="ราคา" style={input} />
 
           <select value={category} onChange={(e) => setCategory(e.target.value)} style={input}>
             <option value="">หมวดหมู่</option>
@@ -213,7 +220,6 @@ function AdminDashboard() {
             <option>Headset</option>
           </select>
 
-          {/* ✅ NEW DESCRIPTION */}
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -221,74 +227,58 @@ function AdminDashboard() {
             style={{ ...input, height: "100px" }}
           />
 
-          <input type="file" onChange={(e) => setImage(e.target.files[0])} style={input}/>
+          <input type="file" onChange={(e) => setImage(e.target.files[0])} style={input} />
 
-          <button onClick={saveProduct} style={btnGreen} disabled={loading}>
+          <button onClick={saveProduct} style={btnGreen}>
             {loading ? "กำลังบันทึก..." : editId ? "บันทึก" : "เพิ่มสินค้า"}
           </button>
         </div>
 
         {/* COUPON */}
         <div style={card}>
-          <h2>🎟 สร้างคูปอง</h2>
+          <h2>🎟 คูปอง</h2>
 
-          <input value={couponCode} onChange={(e) => setCouponCode(e.target.value)} placeholder="CODE เช่น WHY50" style={input}/>
+          <input value={couponCode} onChange={(e) => setCouponCode(e.target.value)} placeholder="CODE" style={input} />
 
           <select value={couponType} onChange={(e) => setCouponType(e.target.value)} style={input}>
             <option value="percent">เปอร์เซ็น</option>
             <option value="fixed">บาท</option>
           </select>
 
-          <input type="number" value={couponValue} onChange={(e) => setCouponValue(e.target.value)} placeholder="Value" style={input}/>
+          <input type="number" value={couponValue} onChange={(e) => setCouponValue(e.target.value)} placeholder="Value" style={input} />
 
-          <button onClick={createCoupon} style={btnBlue}>
-            สร้างคูปอง
-          </button>
+          <button onClick={createCoupon} style={btnBlue}>สร้างคูปอง</button>
 
-          {couponMsg && <p style={{ marginTop: 10 }}>{couponMsg}</p>}
+          {couponMsg && <p>{couponMsg}</p>}
         </div>
       </div>
 
-      {/* PRODUCT LIST */}
+      {/* LIST */}
       <h2 style={{ marginTop: 40 }}>สินค้า</h2>
 
-      {products.length === 0 ? (
-        <p>ไม่มีสินค้า</p>
-      ) : (
-        products.map((p) => (
-          <div key={p.id} style={productCard}>
-            <img
-              src={p.image}
-              width={100}
-              onError={(e) =>
-                (e.target.src = "https://via.placeholder.com/100")
-              }
-            />
+      {products.map((p) => (
+        <div key={p.id} style={productCard}>
+          <img src={p.image} width={100} />
 
-            <div>
-              <p>{p.name}</p>
-              <p>{p.price} บาท</p>
-
-              {/* ✅ NEW */}
-              <p style={{ fontSize: "12px", color: "#94a3b8" }}>
-                {p.description?.slice(0, 50)}...
-              </p>
-            </div>
-
-            <div>
-              <button onClick={() => handleEdit(p)}>แก้ไข</button>
-              <button onClick={() => deleteProduct(p.id)} style={btnRed}>
-                ลบ
-              </button>
-            </div>
+          <div>
+            <p>{p.name}</p>
+            <p>{p.price} บาท</p>
+            <p style={{ fontSize: 12 }}>{p.description?.slice(0, 50)}...</p>
           </div>
-        ))
-      )}
+
+          <div>
+            <button onClick={() => handleEdit(p)}>แก้ไข</button>
+            <button onClick={() => deleteProduct(p.id)} style={btnRed}>
+              ลบ
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
-/* STYLE เหมือนเดิม */
+/* ================= STYLE ================= */
 
 const container = {
   padding: "40px",
@@ -300,7 +290,6 @@ const container = {
 const grid = {
   display: "flex",
   gap: "30px",
-  flexWrap: "wrap",
 };
 
 const card = {
@@ -314,7 +303,6 @@ const input = {
   width: "100%",
   padding: "10px",
   marginBottom: "10px",
-  borderRadius: "6px",
 };
 
 const productCard = {
@@ -323,33 +311,10 @@ const productCard = {
   marginTop: "10px",
   display: "flex",
   justifyContent: "space-between",
-  alignItems: "center",
-  borderRadius: "10px",
 };
 
-const btnGreen = {
-  background: "#22c55e",
-  color: "white",
-  padding: "10px",
-  width: "100%",
-  borderRadius: "6px",
-  border: "none",
-};
-
-const btnBlue = {
-  background: "#2563eb",
-  color: "white",
-  padding: "10px",
-  width: "100%",
-  borderRadius: "6px",
-  border: "none",
-};
-
-const btnRed = {
-  background: "red",
-  color: "white",
-  padding: "6px",
-  border: "none",
-};
+const btnGreen = { background: "#22c55e", color: "white", padding: "10px" };
+const btnBlue = { background: "#2563eb", color: "white", padding: "10px" };
+const btnRed = { background: "red", color: "white", padding: "6px" };
 
 export default AdminDashboard;

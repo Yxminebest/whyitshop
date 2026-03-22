@@ -3,34 +3,64 @@ import { supabase } from "../lib/supabase";
 import { useNavigate, Link } from "react-router-dom";
 
 function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-
   const navigate = useNavigate();
 
-  /* ================= CREATE USER IN TABLE ================= */
+  /* ================= STATE ================= */
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  /* ================= CREATE USER ================= */
   const createUserIfNotExists = async (user) => {
-    const { data } = await supabase
-      .from("users")
-      .select("id")
-      .eq("id", user.id)
-      .maybeSingle();
+    try {
+      const { data } = await supabase
+        .from("users")
+        .select("id")
+        .eq("id", user.id)
+        .maybeSingle();
 
-    if (!data) {
-      await supabase.from("users").insert([
-        {
-          id: user.id,
-          email: user.email,
-          role: "user", // default
-        },
-      ]);
+      if (!data) {
+        await supabase.from("users").insert([
+          {
+            id: user.id,
+            email: user.email,
+            role: "user",
+          },
+        ]);
+      }
+    } catch (err) {
+      console.error("Create user error:", err);
     }
   };
 
-  /* ================= LOGIN ================= */
+  /* ================= GET USER ROLE ================= */
+  const getUserRole = async (userId) => {
+    const { data, error } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", userId)
+      .single();
 
+    if (error) {
+      console.error("Role fetch error:", error);
+      return "user";
+    }
+
+    return data?.role || "user";
+  };
+
+  /* ================= REDIRECT BY ROLE ================= */
+  const redirectByRole = (role) => {
+    if (role === "admin") {
+      navigate("/admin");
+    } else {
+      navigate("/");
+    }
+  };
+
+  /* ================= EMAIL LOGIN ================= */
   const handleLogin = async () => {
     if (!email || !password) {
       alert("กรุณากรอกข้อมูลให้ครบ");
@@ -47,13 +77,19 @@ function Login() {
 
       if (error) {
         alert(error.message);
-      } else {
-        // 🔥 สร้าง user ใน table ถ้ายังไม่มี
-        await createUserIfNotExists(data.user);
-
-        alert("เข้าสู่ระบบสำเร็จ ✅");
-        navigate("/");
+        return;
       }
+
+      const user = data.user;
+
+      // สร้าง user ถ้ายังไม่มี
+      await createUserIfNotExists(user);
+
+      // 🔥 ดึง role
+      const role = await getUserRole(user.id);
+
+      alert(`เข้าสู่ระบบสำเร็จ (${role}) ✅`);
+      redirectByRole(role);
     } catch (err) {
       console.error("Login error:", err);
       alert("เกิดข้อผิดพลาด");
@@ -63,13 +99,19 @@ function Login() {
   };
 
   /* ================= GOOGLE LOGIN ================= */
-
   const handleGoogleLogin = async () => {
     try {
+      setGoogleLoading(true);
+
+      const redirectUrl =
+        window.location.hostname === "localhost"
+          ? "http://localhost:5173"
+          : "https://whyitshop.netlify.app";
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: window.location.origin,
+          redirectTo: redirectUrl,
         },
       });
 
@@ -78,11 +120,13 @@ function Login() {
       }
     } catch (err) {
       console.error("Google login error:", err);
+      alert("Google login ล้มเหลว");
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
   /* ================= UI ================= */
-
   return (
     <div className="login-page">
       <div className="login-card">
@@ -137,8 +181,11 @@ function Login() {
         <button
           className="google-btn"
           onClick={handleGoogleLogin}
+          disabled={googleLoading}
         >
-          🔵 Continue with Google
+          {googleLoading
+            ? "Connecting..."
+            : "🔵 Continue with Google"}
         </button>
       </div>
     </div>
