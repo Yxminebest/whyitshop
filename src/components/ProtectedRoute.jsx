@@ -1,56 +1,41 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
-import { useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 
 function ProtectedRoute({ children }) {
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
     const checkUser = async () => {
       try {
-        // 🔐 1. เช็ค login
-        const { data } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-        if (!data?.user) {
-          navigate("/login");
-          return;
-        }
-
-        // 🔐 2. เช็ค role จาก DB
-        const { data: userData, error } = await supabase
-          .from("users")
-          .select("role")
-          .eq("id", data.user.id)
-          .single();
-
-        if (error || userData?.role !== "admin") {
-          navigate("/"); // ไม่ใช่ admin → กลับหน้า home
-          return;
-        }
-
-        // ✅ ผ่าน → แสดงหน้าได้
-        setLoading(false);
-
+        setUser(user);
       } catch (err) {
         console.error(err);
-        navigate("/login");
+      } finally {
+        setLoading(false);
       }
     };
 
     checkUser();
-  }, [navigate]);
+  }, []);
 
-  // ⏳ ระหว่างโหลด
   if (loading) {
     return (
       <p style={{ color: "white", padding: "40px" }}>
-        Checking permission...
+        Checking login...
       </p>
     );
   }
 
-  // ✅ ผ่านแล้ว
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
   return children;
 }
 

@@ -1,105 +1,132 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useContext, useEffect, useState } from "react";
 import { CartContext } from "../context/CartContext";
 import { supabase } from "../lib/supabase";
 
 function Navbar() {
   const { cartItems } = useContext(CartContext);
+  const navigate = useNavigate();
 
+  /* ================= STATE ================= */
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
 
-  /* ================= CART COUNT ================= */
-
+  /* ================= CART ================= */
   const totalQty = cartItems.reduce(
     (sum, item) => sum + (item.qty || 1),
     0
   );
 
   /* ================= FETCH ROLE ================= */
-
   const fetchRole = async (userId) => {
-    const { data } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", userId)
-      .maybeSingle();
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", userId)
+        .maybeSingle();
 
-    setRole(data?.role || "user");
+      if (error) {
+        console.error("Role fetch error:", error);
+        setRole("user");
+        return;
+      }
+
+      setRole(data?.role || "user");
+    } catch (err) {
+      console.error("Fetch role error:", err);
+      setRole("user");
+    }
   };
 
   /* ================= AUTH ================= */
-
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data?.session?.user) {
-        setUser(data.session.user);
-        fetchRole(data.session.user.id);
+    let isMounted = true;
+
+    const loadSession = async () => {
+      const { data } = await supabase.auth.getSession();
+
+      if (!isMounted) return;
+
+      const currentUser = data?.session?.user || null;
+
+      setUser(currentUser);
+
+      if (currentUser) {
+        fetchRole(currentUser.id);
       }
-    });
+    };
+
+    loadSession();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        if (session?.user) {
-          setUser(session.user);
-          fetchRole(session.user.id);
+        const currentUser = session?.user || null;
+
+        setUser(currentUser);
+
+        if (currentUser) {
+          fetchRole(currentUser.id);
         } else {
-          setUser(null);
           setRole(null);
         }
       }
     );
 
     return () => {
+      isMounted = false;
       listener.subscription.unsubscribe();
     };
   }, []);
 
   /* ================= LOGOUT ================= */
-
   const logoutUser = async () => {
-    await supabase.auth.signOut();
-    localStorage.clear();
-    sessionStorage.clear();
-    window.location.replace("/login");
+    try {
+      await supabase.auth.signOut();
+
+      localStorage.clear();
+      sessionStorage.clear();
+
+      navigate("/login");
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
   };
 
   /* ================= UI ================= */
-
   return (
     <nav style={nav}>
-      <h2 style={{ fontWeight: "bold" }}>💻 WHY IT Shop</h2>
+      <h2 style={logo}>💻 WHY IT Shop</h2>
 
       <div style={menu}>
+        {/* PUBLIC */}
         <Link to="/" style={link}>Home</Link>
         <Link to="/products" style={link}>Products</Link>
-
-        {/* 🔥 เพิ่ม Coupons ตรงนี้ */}
         <Link to="/coupons" style={link}>Coupons</Link>
 
+        {/* CART */}
         <Link to="/cart" style={link}>
           Cart 🛒 ({totalQty})
         </Link>
 
+        {/* USER */}
         {user && (
-          <Link to="/profile" style={link}>
-            Profile
-          </Link>
-        )}
-
-        {/* 🔐 ADMIN */}
-        {role === "admin" && (
           <>
-            <Link to="/admin" style={link}>
-              Admin
-            </Link>
-            <Link to="/admin/users" style={link}>
-              Manage Users
-            </Link>
+            <Link to="/profile" style={link}>Profile</Link>
+            <Link to="/my-orders" style={link}>My Orders</Link>
           </>
         )}
 
-        {/* USER INFO */}
+        {/* ADMIN */}
+        {role === "admin" && (
+          <>
+            <Link to="/admin" style={link}>Dashboard</Link>
+            <Link to="/admin/users" style={link}>Users</Link>
+            <Link to="/admin/orders" style={link}>Orders</Link>
+          </>
+        )}
+
+        {/* AUTH */}
         {user ? (
           <>
             <span style={userText}>
@@ -111,9 +138,7 @@ function Navbar() {
             </button>
           </>
         ) : (
-          <Link to="/login" style={link}>
-            Login
-          </Link>
+          <Link to="/login" style={link}>Login</Link>
         )}
       </div>
     </nav>
@@ -130,6 +155,10 @@ const nav = {
   alignItems: "center",
   color: "white",
   boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+};
+
+const logo = {
+  fontWeight: "bold",
 };
 
 const menu = {
@@ -157,7 +186,6 @@ const logoutBtn = {
   padding: "6px 12px",
   borderRadius: "6px",
   cursor: "pointer",
-  transition: "0.2s",
 };
 
 export default Navbar;

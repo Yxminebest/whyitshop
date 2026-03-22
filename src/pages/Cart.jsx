@@ -4,9 +4,12 @@ import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
 
 function Cart() {
-  const { cartItems, removeFromCart, setCartItems } = useContext(CartContext);
+  const { cartItems, removeFromCart, setCartItems } =
+    useContext(CartContext);
+
   const navigate = useNavigate();
 
+  /* ================= STATE ================= */
   const [user, setUser] = useState(null);
   const [coupon, setCoupon] = useState("");
   const [discount, setDiscount] = useState(0);
@@ -15,6 +18,7 @@ function Cart() {
   const [slipPreview, setSlipPreview] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  /* ================= CALCULATE ================= */
   const totalPrice = cartItems.reduce(
     (sum, item) => sum + item.price * item.qty,
     0
@@ -22,14 +26,17 @@ function Cart() {
 
   const finalPrice = Math.max(totalPrice - discount, 0);
 
+  /* ================= GET USER ================= */
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser();
       setUser(data?.user || null);
-    });
+    };
+
+    getUser();
   }, []);
 
   /* ================= COUPON ================= */
-
   const applyCoupon = async () => {
     setMessage("");
 
@@ -56,64 +63,99 @@ function Cart() {
   };
 
   /* ================= SLIP ================= */
-
-  const handleSlipUpload = (e) => {
+  const handleSlipUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // 🔥 กันตั้งแต่เลือกไฟล์ (สำคัญ)
+    if (!user) {
+      alert("กรุณาเข้าสู่ระบบก่อนอัปโหลด ❌");
+      navigate("/login");
+      return;
+    }
 
     setSlipFile(file);
     setSlipPreview(URL.createObjectURL(file));
   };
 
   /* ================= PAYMENT ================= */
-
   const confirmPayment = async () => {
-    if (!user) return navigate("/login");
-    if (!slipFile) return alert("แนบสลิปก่อน");
+    // 🔥 เช็ค login ซ้ำ (กัน 2 ชั้น)
+    if (!user) {
+      alert("กรุณาเข้าสู่ระบบก่อน");
+      return navigate("/login");
+    }
 
-    setLoading(true);
+    if (!slipFile) {
+      alert("กรุณาแนบสลิป");
+      return;
+    }
 
-    const filePath = `slips/${user.id}_${Date.now()}`;
-    await supabase.storage.from("slips").upload(filePath, slipFile);
+    try {
+      setLoading(true);
 
-    const { data: urlData } = supabase.storage
-      .from("slips")
-      .getPublicUrl(filePath);
+      /* 🔥 path = user.id (ตรงกับ policy) */
+      const filePath = `${user.id}/${Date.now()}_${slipFile.name}`;
 
-    const { data: orderData } = await supabase
-      .from("orders")
-      .insert([
-        {
-          total_price: finalPrice,
-          status: "pending",
-          slip: urlData.publicUrl,
-        },
-      ])
-      .select();
+      /* 🔥 upload */
+      const { error: uploadError } = await supabase.storage
+        .from("slips")
+        .upload(filePath, slipFile);
 
-    const order = orderData[0];
+      if (uploadError) {
+        console.error(uploadError);
+        alert("อัปโหลดไม่สำเร็จ ❌");
+        return;
+      }
 
-    await supabase.from("order_items").insert(
-      cartItems.map((i) => ({
-        order_id: order.id,
-        product_id: i.id,
-        name: i.name,
-        price: i.price,
-        qty: i.qty,
-      }))
-    );
+      /* 🔥 insert order */
+      const { data: orderData, error: orderError } = await supabase
+        .from("orders")
+        .insert([
+          {
+            total_price: finalPrice,
+            status: "pending",
+            slip: filePath,
+            user_id: user.id,
+          },
+        ])
+        .select();
 
-    setCartItems([]);
-    alert("🎉 สำเร็จ!");
-    navigate("/");
+      if (orderError) throw orderError;
+
+      const order = orderData[0];
+
+      /* 🔥 insert order items */
+      const { error: itemError } = await supabase
+        .from("order_items")
+        .insert(
+          cartItems.map((i) => ({
+            order_id: order.id,
+            product_id: i.id,
+            name: i.name,
+            price: i.price,
+            qty: i.qty,
+          }))
+        );
+
+      if (itemError) throw itemError;
+
+      setCartItems([]);
+      alert("🎉 ชำระเงินสำเร็จ");
+      navigate("/");
+
+    } catch (err) {
+      console.error(err);
+      alert("เกิดข้อผิดพลาด");
+    } finally {
+      setLoading(false);
+    }
   };
 
   /* ================= UI ================= */
-
   return (
     <div style={container}>
       <div style={wrapper}>
-        
         {/* LEFT */}
         <div style={left}>
           <h2>🛒 สินค้า</h2>
@@ -174,7 +216,7 @@ function Cart() {
           <input type="file" onChange={handleSlipUpload} />
 
           {slipPreview && (
-            <img src={slipPreview} style={preview} />
+            <img src={slipPreview} style={preview} alt="slip" />
           )}
 
           <button
@@ -185,7 +227,6 @@ function Cart() {
             {loading ? "กำลังบันทึก..." : "ยืนยันการชำระเงิน"}
           </button>
         </div>
-
       </div>
     </div>
   );
@@ -204,11 +245,6 @@ const wrapper = {
   display: "grid",
   gridTemplateColumns: "2fr 1fr",
   gap: "20px",
-
-  // 🔥 Responsive
-  "@media (max-width: 768px)": {
-    gridTemplateColumns: "1fr",
-  },
 };
 
 const left = {

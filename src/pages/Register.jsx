@@ -16,6 +16,7 @@ const sanitizeInput = (text) => {
 function Register() {
   const navigate = useNavigate();
 
+  /* ================= STATE ================= */
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
@@ -25,6 +26,7 @@ function Register() {
   const [newsletter, setNewsletter] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  /* ================= REGISTER ================= */
   const handleRegister = async () => {
     if (!firstName || !lastName || !username || !email || !password) {
       alert("กรุณากรอกข้อมูลให้ครบ");
@@ -44,11 +46,12 @@ function Register() {
     try {
       setLoading(true);
 
+      // 🔐 sanitize
       const safeFirstName = sanitizeInput(firstName);
       const safeLastName = sanitizeInput(lastName);
       const safeUsername = sanitizeInput(username);
 
-      /* ================= AUTH ================= */
+      /* ================= AUTH SIGNUP ================= */
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -56,15 +59,13 @@ function Register() {
 
       if (error) {
         alert(error.message);
-        setLoading(false);
         return;
       }
 
       const user = data?.user || data?.session?.user;
 
       if (!user) {
-        alert("สมัครสำเร็จ แต่ต้องยืนยันอีเมลก่อน");
-        setLoading(false);
+        alert("สมัครสำเร็จ กรุณายืนยันอีเมลก่อน");
         return;
       }
 
@@ -79,17 +80,16 @@ function Register() {
             firstname: safeFirstName,
             lastname: safeLastName,
             newsletter: newsletter,
-            role: "customer",
+            role: "user", // ✅ FIXED (สำคัญมาก)
             avatar: null,
             address: null,
-            phone: null, // 🔥 เพิ่มให้ตรง schema ล่าสุด
+            phone: null,
           },
         ]);
 
       if (insertError) {
         console.error(insertError);
         alert("สมัครสำเร็จ แต่บันทึกโปรไฟล์ไม่สำเร็จ");
-        setLoading(false);
         return;
       }
 
@@ -99,11 +99,12 @@ function Register() {
     } catch (err) {
       console.error(err);
       alert("เกิดข้อผิดพลาด: " + err.message);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
+  /* ================= UI ================= */
   return (
     <div className="register-page">
       <div className="register-card">
@@ -160,9 +161,9 @@ function Register() {
           Subscribe to Newsletter
         </label>
 
-        {/* 🔥 ปุ่ม */}
+        {/* BUTTONS */}
         <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "10px" }}>
-
+          
           <button onClick={handleRegister} disabled={loading}>
             {loading ? "Loading..." : "REGISTER"}
           </button>
@@ -171,7 +172,6 @@ function Register() {
             CANCEL
           </button>
 
-          {/* ✅ ปุ่มกลับหน้าแรก */}
           <button onClick={() => navigate("/")}>
             กลับหน้าแรก
           </button>
