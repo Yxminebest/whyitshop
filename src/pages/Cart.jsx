@@ -122,7 +122,7 @@ function Cart() {
             user_id: user.id,
             total_price: finalPrice,
             status: "pending",
-            slip_url: publicUrl,
+            slip: publicUrl,
           },
         ])
         .select()
@@ -140,7 +140,8 @@ function Cart() {
       const orderItems = cartItems.map((item) => ({
         order_id: orderData.id,
         product_id: item.id,
-        quantity: item.qty || 1, // ✅ ใช้ quantity แล้ว
+        name: item.name,
+        quantity: item.qty || 1, 
         price: item.price,
       }));
 

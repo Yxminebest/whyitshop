@@ -103,10 +103,7 @@ function Login() {
     try {
       setGoogleLoading(true);
 
-      const redirectUrl =
-        window.location.hostname === "localhost"
-          ? "http://localhost:5173"
-          : "https://whyitshop.netlify.app";
+      const redirectUrl = window.location.origin;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",

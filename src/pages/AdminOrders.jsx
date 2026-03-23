@@ -14,6 +14,7 @@ function AdminOrders() {
     try {
       setLoading(true);
 
+      // ✅ ดึงข้อมูล order พร้อมกับ order_items ทั้งหมด
       const { data, error } = await supabase
         .from("orders")
         .select(`
@@ -119,7 +120,7 @@ function AdminOrders() {
             <div key={order.id} style={card}>
               {/* HEADER */}
               <div style={topRow}>
-                <h3>🧾 {order.id}</h3>
+                <h3>🧾 {order.id.slice(0, 8)}...</h3>
 
                 <span
                   style={{
@@ -132,22 +133,25 @@ function AdminOrders() {
               </div>
 
               {/* INFO */}
-              <p>💰 {order.total_price} บาท</p>
-              <p>👤 {order.user_id}</p>
+              <p style={priceText}>💰 {order.total_price} บาท</p>
+              <p style={userText}>👤 User ID: {order.user_id}</p>
 
               {/* ITEMS */}
-              <div style={{ marginTop: "10px" }}>
-                <strong>สินค้า:</strong>
+              <div style={{ marginTop: "15px" }}>
+                <strong>รายการสินค้า:</strong>
                 {order.order_items?.map((item) => (
-                  <div key={item.id}>
-                    - {item.product_id} (x{item.quantity})
+                  <div key={item.id} style={productItem}>
+                    🛍 {item.name || `รหัส: ${item.product_id}`}
+                    <div style={meta}>
+                      {item.price} บาท × {item.quantity}
+                    </div>
                   </div>
                 ))}
               </div>
 
               {/* SLIP */}
               <div style={{ marginTop: "15px" }}>
-                <strong>สลิป:</strong>
+                <strong>สลิปโอนเงิน:</strong>
 
                 {slipUrl ? (
                   <div style={{ marginTop: "10px" }}>
@@ -159,12 +163,15 @@ function AdminOrders() {
                     />
                   </div>
                 ) : (
-                  <p style={{ opacity: 0.6 }}>ไม่มีสลิป</p>
+                  <p style={{ opacity: 0.6, fontSize: "14px", marginTop: "5px" }}>
+                    ไม่มีสลิปแนบมา
+                  </p>
                 )}
               </div>
 
               {/* STATUS CONTROL */}
-              <div style={{ marginTop: "15px" }}>
+              <div style={{ marginTop: "20px", borderTop: "1px solid #334155", paddingTop: "15px" }}>
+                <strong style={{ marginRight: "10px" }}>อัปเดตสถานะ:</strong>
                 <select
                   value={order.status}
                   onChange={(e) =>
@@ -173,11 +180,11 @@ function AdminOrders() {
                   disabled={updatingId === order.id}
                   style={select}
                 >
-                  <option value="pending">Pending</option>
-                  <option value="paid">Paid</option>
-                  <option value="shipped">Shipped</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
+                  <option value="pending">Pending (รอตรวจสอบ)</option>
+                  <option value="paid">Paid (ชำระเงินแล้ว)</option>
+                  <option value="shipped">Shipped (จัดส่งแล้ว)</option>
+                  <option value="completed">Completed (สำเร็จ)</option>
+                  <option value="cancelled">Cancelled (ยกเลิก)</option>
                 </select>
               </div>
             </div>
@@ -185,7 +192,7 @@ function AdminOrders() {
         })
       )}
 
-      {/* 🔥 MODAL */}
+      {/* 🔥 MODAL (แสดงรูปสลิปเต็มจอ) */}
       {selectedSlip && (
         <div style={modal} onClick={() => setSelectedSlip(null)}>
           <img src={selectedSlip} alt="full slip" style={modalImg} />
@@ -200,12 +207,15 @@ function AdminOrders() {
 const container = {
   padding: "40px",
   color: "white",
+  background: "#020617",
+  minHeight: "100vh",
 };
 
 const header = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
+  marginBottom: "20px",
 };
 
 const refreshBtn = {
@@ -215,6 +225,7 @@ const refreshBtn = {
   borderRadius: "6px",
   cursor: "pointer",
   color: "white",
+  fontWeight: "bold",
 };
 
 const card = {
@@ -222,25 +233,63 @@ const card = {
   padding: "20px",
   borderRadius: "12px",
   marginTop: "20px",
+  border: "1px solid #1e293b",
 };
 
 const topRow = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
+  borderBottom: "1px solid #1e293b",
+  paddingBottom: "10px",
+  marginBottom: "10px",
+};
+
+const priceText = {
+  color: "#22c55e",
+  fontSize: "18px",
+  fontWeight: "bold",
+  marginTop: "5px",
+};
+
+const userText = {
+  fontSize: "12px",
+  color: "#94a3b8",
+  marginTop: "5px",
+};
+
+const productItem = {
+  background: "#1e293b",
+  padding: "10px 15px",
+  marginTop: "8px",
+  borderRadius: "8px",
+};
+
+const meta = {
+  fontSize: "13px",
+  opacity: 0.8,
+  marginTop: "4px",
+  marginLeft: "22px",
 };
 
 const select = {
-  padding: "6px 10px",
+  padding: "8px 12px",
   borderRadius: "6px",
-  border: "none",
+  border: "1px solid #334155",
+  background: "#1e293b",
+  color: "white",
+  cursor: "pointer",
+  outline: "none",
 };
 
 const slipImg = {
   width: "120px",
+  height: "180px",
+  objectFit: "cover",
   borderRadius: "8px",
   cursor: "pointer",
-  border: "2px solid #1e293b",
+  border: "2px solid #334155",
+  transition: "0.2s",
 };
 
 const modal = {
@@ -249,17 +298,19 @@ const modal = {
   left: 0,
   width: "100%",
   height: "100%",
-  background: "rgba(0,0,0,0.8)",
+  background: "rgba(0,0,0,0.85)",
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
   zIndex: 999,
+  cursor: "pointer",
 };
 
 const modalImg = {
   maxWidth: "90%",
   maxHeight: "90%",
   borderRadius: "10px",
+  boxShadow: "0 0 30px rgba(0,0,0,0.8)",
 };
 
 export default AdminOrders;
