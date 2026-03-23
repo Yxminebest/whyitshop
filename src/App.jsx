@@ -1,11 +1,11 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 
 /* ================= COMPONENTS ================= */
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
-import AdminRoute from "./components/AdminRoute"; // 
+import AdminRoute from "./components/AdminRoute"; 
 
 /* ================= PUBLIC PAGES ================= */
 import Home from "./pages/Home";
@@ -30,28 +30,29 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminOrders from "./pages/AdminOrders";
 
 function App() {
+  /* ================= THEME STATE ================= */
+  const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
+
+  useEffect(() => {
+    // อัปเดต data-theme ที่แท็ก <html> เพื่อให้ CSS ทำงาน
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+  };
+
   /* ================= SYNC USER ================= */
   useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === "SIGNED_IN" && session?.user) {
           const user = session.user;
-
           try {
-            const { data } = await supabase
-              .from("users")
-              .select("id")
-              .eq("id", user.id)
-              .maybeSingle();
-
+            const { data } = await supabase.from("users").select("id").eq("id", user.id).maybeSingle();
             if (!data) {
-              await supabase.from("users").insert([
-                {
-                  id: user.id,
-                  email: user.email,
-                  role: "user",
-                },
-              ]);
+              await supabase.from("users").insert([{ id: user.id, email: user.email, role: "user" }]);
             }
           } catch (err) {
             console.error("Sync user error:", err);
@@ -59,90 +60,39 @@ function App() {
         }
       }
     );
-
     return () => {
       listener.subscription.unsubscribe();
     };
   }, []);
 
-  /* ================= UI ================= */
   return (
     <Router>
-      <Navbar />
-
-      <div style={layout}>
+      <Navbar theme={theme} toggleTheme={toggleTheme} />
+      
+      {/* เอา style={layout} ออก เพราะเราจัดการด้วย body ใน CSS แล้ว */}
+      <div>
         <Routes>
-          {/* ================= PUBLIC ================= */}
           <Route path="/" element={<Home />} />
           <Route path="/products" element={<Products />} />
           <Route path="/product/:id" element={<ProductDetail />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/coupons" element={<Coupons />} />
 
-          {/* ================= AUTH ================= */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 
-          {/* ================= USER ================= */}
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/my-orders" element={<ProtectedRoute><MyOrders /></ProtectedRoute>} />
 
-          <Route
-            path="/my-orders"
-            element={
-              <ProtectedRoute>
-                <MyOrders />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* ================= ADMIN ================= */}
-          <Route
-            path="/admin"
-            element={
-              <AdminRoute>
-                <AdminDashboard />
-              </AdminRoute>
-            }
-          />
-
-          <Route
-            path="/admin/users"
-            element={
-              <AdminRoute>
-                <AdminUsers />
-              </AdminRoute>
-            }
-          />
-
-          <Route
-            path="/admin/orders"
-            element={
-              <AdminRoute>
-                <AdminOrders />
-              </AdminRoute>
-            }
-          />
+          <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+          <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+          <Route path="/admin/orders" element={<AdminRoute><AdminOrders /></AdminRoute>} />
         </Routes>
       </div>
     </Router>
   );
 }
-
-/* ================= STYLE ================= */
-
-const layout = {
-  background: "#0B1120",
-  minHeight: "100vh",
-  color: "white",
-};
 
 export default App;

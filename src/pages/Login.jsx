@@ -4,186 +4,87 @@ import { useNavigate, Link } from "react-router-dom";
 
 function Login() {
   const navigate = useNavigate();
-
-  /* ================= STATE ================= */
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  /* ================= CREATE USER ================= */
   const createUserIfNotExists = async (user) => {
     try {
-      const { data } = await supabase
-        .from("users")
-        .select("id")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (!data) {
-        await supabase.from("users").insert([
-          {
-            id: user.id,
-            email: user.email,
-            role: "user",
-          },
-        ]);
-      }
+      const { data } = await supabase.from("users").select("id").eq("id", user.id).maybeSingle();
+      if (!data) await supabase.from("users").insert([{ id: user.id, email: user.email, role: "user" }]);
     } catch (err) {
       console.error("Create user error:", err);
     }
   };
 
-  /* ================= GET USER ROLE ================= */
   const getUserRole = async (userId) => {
-    const { data, error } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", userId)
-      .single();
-
-    if (error) {
-      console.error("Role fetch error:", error);
-      return "user";
-    }
-
+    const { data, error } = await supabase.from("users").select("role").eq("id", userId).single();
+    if (error) return "user";
     return data?.role || "user";
   };
 
-  /* ================= REDIRECT BY ROLE ================= */
-  const redirectByRole = (role) => {
-    if (role === "admin") {
-      navigate("/admin");
-    } else {
-      navigate("/");
-    }
-  };
-
-  /* ================= EMAIL LOGIN ================= */
   const handleLogin = async () => {
-    if (!email || !password) {
-      alert("กรุณากรอกข้อมูลให้ครบ");
-      return;
-    }
-
+    if (!email || !password) return alert("กรุณากรอกข้อมูลให้ครบ");
     try {
       setLoading(true);
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        alert(error.message);
-        return;
-      }
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return alert(error.message);
 
       const user = data.user;
-
-      // สร้าง user ถ้ายังไม่มี
       await createUserIfNotExists(user);
-
-      // 🔥 ดึง role
       const role = await getUserRole(user.id);
 
-      alert(`เข้าสู่ระบบสำเร็จ (${role}) ✅`);
-      redirectByRole(role);
+      navigate(role === "admin" ? "/admin" : "/");
     } catch (err) {
-      console.error("Login error:", err);
       alert("เกิดข้อผิดพลาด");
     } finally {
       setLoading(false);
     }
   };
 
-  /* ================= GOOGLE LOGIN ================= */
   const handleGoogleLogin = async () => {
     try {
       setGoogleLoading(true);
-
-      const redirectUrl = window.location.origin;
-
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: {
-          redirectTo: redirectUrl,
-        },
+        options: { redirectTo: window.location.origin },
       });
-
-      if (error) {
-        alert(error.message);
-      }
+      if (error) alert(error.message);
     } catch (err) {
-      console.error("Google login error:", err);
       alert("Google login ล้มเหลว");
     } finally {
       setGoogleLoading(false);
     }
   };
 
-  /* ================= UI ================= */
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <h1>Welcome Back 👋</h1>
+    <div className="page-container" style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+      <div className="glass-card" style={{ width: "100%", maxWidth: "420px", display: "flex", flexDirection: "column", gap: "18px" }}>
+        
+        <h1 style={{ textAlign: "center", marginBottom: "10px" }}>Welcome Back 👋</h1>
 
-        {/* EMAIL */}
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-glass" />
+        <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="input-glass" />
 
-        {/* PASSWORD */}
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <div style={{ textAlign: "right", marginTop: "-10px", marginBottom: "10px" }}>
+          <Link to="/forgot-password" style={{ color: "var(--primary)", fontSize: "14px", textDecoration: "none" }}>Forgot Password?</Link>
+        </div>
 
-        {/* FORGOT PASSWORD */}
-        <p style={{ marginTop: "8px", fontSize: "14px" }}>
-          <Link
-            to="/forgot-password"
-            style={{ color: "#38bdf8", textDecoration: "none" }}
-          >
-            Forgot Password?
-          </Link>
-        </p>
-
-        {/* LOGIN */}
-        <button
-          className="login-btn"
-          onClick={handleLogin}
-          disabled={loading}
-        >
+        <button onClick={handleLogin} disabled={loading} className="btn-primary" style={{ padding: "14px" }}>
           {loading ? "Loading..." : "Login"}
         </button>
 
-        {/* REGISTER */}
-        <button
-          className="register-btn"
-          onClick={() => navigate("/register")}
-        >
+        <button onClick={() => navigate("/register")} className="btn-success" style={{ padding: "14px" }}>
           Register
         </button>
 
-        <div className="divider">or</div>
+        <div style={{ textAlign: "center", color: "var(--text-muted)", fontSize: "14px", margin: "10px 0" }}>or</div>
 
-        {/* GOOGLE LOGIN */}
-        <button
-          className="google-btn"
-          onClick={handleGoogleLogin}
-          disabled={googleLoading}
-        >
-          {googleLoading
-            ? "Connecting..."
-            : "🔵 Continue with Google"}
+        <button onClick={handleGoogleLogin} disabled={googleLoading} className="btn-primary" style={{ background: "var(--bg-secondary)", color: "var(--text-main)", border: "1px solid var(--card-border)" }}>
+          {googleLoading ? "Connecting..." : "🔵 Continue with Google"}
         </button>
+        
       </div>
     </div>
   );

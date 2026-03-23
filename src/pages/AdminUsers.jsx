@@ -4,41 +4,23 @@ import { useNavigate } from "react-router-dom";
 
 function AdminUsers() {
   const navigate = useNavigate();
-
-  /* ================= STATE ================= */
   const [users, setUsers] = useState([]);
   const [editingUser, setEditingUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  /* ================= INIT ================= */
   useEffect(() => {
     checkAdmin();
-  }, []);
-
-  useEffect(() => {
     fetchUsers();
   }, []);
 
-  /* ================= CHECK ADMIN ================= */
   const checkAdmin = async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return navigate("/login");
 
-      if (!user) {
-        navigate("/login");
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("users")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-
+      const { data, error } = await supabase.from("users").select("role").eq("id", user.id).single();
       if (error || data?.role !== "admin") {
-        alert("คุณไม่มีสิทธิ์ ❌");
+        alert("คุณไม่มีสิทธิ์เข้าถึงหน้านี้ ❌");
         navigate("/");
       }
     } catch (err) {
@@ -47,23 +29,12 @@ function AdminUsers() {
     }
   };
 
-  /* ================= FETCH USERS ================= */
   const fetchUsers = async () => {
     try {
       setLoading(true);
-
-      const { data, error } = await supabase
-        .from("users")
-        .select("*");
-
-      console.log("ALL USERS:", data); // 🔥 debug
-
-      if (error) {
-        console.error(error);
-        alert("โหลด user ไม่สำเร็จ");
-      } else {
-        setUsers(data || []);
-      }
+      const { data, error } = await supabase.from("users").select("*").order("created_at", { ascending: false });
+      if (error) alert("โหลดข้อมูลผู้ใช้ไม่สำเร็จ");
+      else setUsers(data || []);
     } catch (err) {
       console.error("Fetch error:", err);
     } finally {
@@ -71,179 +42,113 @@ function AdminUsers() {
     }
   };
 
-  /* ================= TOGGLE ROLE ================= */
   const toggleRole = async (id, currentRole) => {
     const newRole = currentRole === "admin" ? "user" : "admin";
+    if (!window.confirm(`ยืนยันการเปลี่ยนสิทธิ์เป็น ${newRole.toUpperCase()}?`)) return;
 
-    if (!window.confirm(`เปลี่ยนเป็น ${newRole}?`)) return;
-
-    const { error } = await supabase
-      .from("users")
-      .update({ role: newRole })
-      .eq("id", id);
-
-    if (error) {
-      alert("❌ เปลี่ยน role ไม่สำเร็จ");
-    } else {
-      fetchUsers();
-    }
+    const { error } = await supabase.from("users").update({ role: newRole }).eq("id", id);
+    if (error) alert("❌ เปลี่ยน Role ไม่สำเร็จ");
+    else fetchUsers();
   };
 
-  /* ================= DELETE ================= */
   const deleteUser = async (id) => {
-    if (!window.confirm("Delete user?")) return;
+    if (!window.confirm("⚠️ คุณแน่ใจหรือไม่ที่จะลบผู้ใช้นี้ออกจากระบบ?")) return;
 
-    const { error } = await supabase
-      .from("users")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      alert("❌ ลบไม่สำเร็จ");
-    } else {
-      fetchUsers();
-    }
+    const { error } = await supabase.from("users").delete().eq("id", id);
+    if (error) alert("❌ ลบผู้ใช้ไม่สำเร็จ");
+    else fetchUsers();
   };
 
-  /* ================= SAVE EDIT ================= */
   const saveEdit = async () => {
     if (!editingUser) return;
+    const { error } = await supabase.from("users").update({
+      username: editingUser.username,
+      phone: editingUser.phone,
+    }).eq("id", editingUser.id);
 
-    const { error } = await supabase
-      .from("users")
-      .update({
-        username: editingUser.username,
-        phone: editingUser.phone,
-      })
-      .eq("id", editingUser.id);
-
-    if (error) {
-      alert("❌ บันทึกไม่สำเร็จ");
-    } else {
+    if (error) alert("❌ บันทึกการแก้ไขไม่สำเร็จ");
+    else {
       setEditingUser(null);
       fetchUsers();
     }
   };
 
-  /* ================= UI ================= */
   return (
-    <div style={container}>
-      <h1 style={title}>👥 Manage Users</h1>
+    <div className="page-container">
+      <h1 style={{ marginBottom: "30px", fontWeight: "800" }}>👥 Manage Users</h1>
 
-      <div style={card}>
+      <div className="glass-card" style={{ overflowX: "auto", padding: "20px" }}>
         {loading ? (
-          <p>Loading...</p>
+          <p style={{ color: "var(--text-muted)", textAlign: "center" }}>กำลังโหลดข้อมูล...</p>
         ) : users.length === 0 ? (
-          <p>❌ ไม่มี user</p>
+          <p style={{ color: "var(--danger)", textAlign: "center" }}>❌ ไม่มีผู้ใช้อยู่ในระบบ</p>
         ) : (
-          <table style={table}>
+          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
             <thead>
-              <tr>
-                <th style={th}>Email</th>
-                <th style={th}>Username</th>
-                <th style={th}>Phone</th>
-                <th style={th}>Role</th>
-                <th style={th}>Actions</th>
+              <tr style={{ borderBottom: "2px solid var(--card-border)", color: "var(--text-muted)" }}>
+                <th style={{ padding: "15px" }}>Email</th>
+                <th style={{ padding: "15px" }}>Username</th>
+                <th style={{ padding: "15px" }}>Phone</th>
+                <th style={{ padding: "15px" }}>Role</th>
+                <th style={{ padding: "15px" }}>Actions</th>
               </tr>
             </thead>
-
             <tbody>
               {users.map((user) => (
-                <tr key={user.id}>
-                  <td style={td}>{user.email}</td>
-
-                  {/* USERNAME */}
-                  <td style={td}>
+                <tr key={user.id} style={{ borderBottom: "1px solid var(--card-border)", transition: "0.2s" }}>
+                  
+                  <td style={{ padding: "15px" }}>{user.email}</td>
+                  
+                  <td style={{ padding: "15px" }}>
                     {editingUser?.id === user.id ? (
                       <input
+                        className="input-glass"
+                        style={{ marginBottom: 0, padding: "8px" }}
                         value={editingUser?.username || ""}
-                        onChange={(e) =>
-                          setEditingUser({
-                            ...editingUser,
-                            username: e.target.value,
-                          })
-                        }
-                        style={input}
+                        onChange={(e) => setEditingUser({ ...editingUser, username: e.target.value })}
                       />
-                    ) : (
-                      user.username || "-"
-                    )}
+                    ) : (user.username || "-")}
                   </td>
-
-                  {/* PHONE */}
-                  <td style={td}>
+                  
+                  <td style={{ padding: "15px" }}>
                     {editingUser?.id === user.id ? (
                       <input
+                        className="input-glass"
+                        style={{ marginBottom: 0, padding: "8px" }}
                         value={editingUser?.phone || ""}
-                        onChange={(e) =>
-                          setEditingUser({
-                            ...editingUser,
-                            phone: e.target.value,
-                          })
-                        }
-                        style={input}
+                        onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
                       />
-                    ) : (
-                      user.phone || "-"
-                    )}
+                    ) : (user.phone || "-")}
                   </td>
-
-                  {/* ROLE */}
-                  <td style={td}>
-                    <span
-                      style={{
-                        color:
-                          user.role === "admin"
-                            ? "#22c55e"
-                            : "#94a3b8",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {user.role}
+                  
+                  <td style={{ padding: "15px" }}>
+                    <span style={{ 
+                      background: user.role === "admin" ? "rgba(34, 197, 94, 0.2)" : "var(--bg-secondary)", 
+                      color: user.role === "admin" ? "var(--accent)" : "var(--text-muted)", 
+                      padding: "5px 10px", 
+                      borderRadius: "6px", 
+                      fontWeight: "bold",
+                      border: "1px solid var(--card-border)"
+                    }}>
+                      {user.role.toUpperCase()}
                     </span>
                   </td>
-
-                  {/* ACTIONS */}
-                  <td style={td}>
+                  
+                  <td style={{ padding: "15px" }}>
                     {editingUser?.id === user.id ? (
-                      <>
-                        <button style={btnPrimary} onClick={saveEdit}>
-                          Save
-                        </button>
-                        <button
-                          style={btnSecondary}
-                          onClick={() => setEditingUser(null)}
-                        >
-                          Cancel
-                        </button>
-                      </>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button className="btn-success" onClick={saveEdit} style={{ padding: "6px 12px", fontSize: "13px" }}>Save</button>
+                        <button className="btn-primary" onClick={() => setEditingUser(null)} style={{ background: "var(--bg-secondary)", color: "var(--text-main)", padding: "6px 12px", fontSize: "13px", border: "1px solid var(--card-border)" }}>Cancel</button>
+                      </div>
                     ) : (
-                      <>
-                        <button
-                          style={btnPrimary}
-                          onClick={() => setEditingUser(user)}
-                        >
-                          Edit
-                        </button>
-
-                        <button
-                          style={btnRole}
-                          onClick={() =>
-                            toggleRole(user.id, user.role)
-                          }
-                        >
-                          Role
-                        </button>
-
-                        <button
-                          style={btnDanger}
-                          onClick={() => deleteUser(user.id)}
-                        >
-                          Delete
-                        </button>
-                      </>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button className="btn-primary" onClick={() => setEditingUser(user)} style={{ padding: "6px 12px", fontSize: "13px", background: "var(--primary)" }}>Edit</button>
+                        <button className="btn-success" onClick={() => toggleRole(user.id, user.role)} style={{ padding: "6px 12px", fontSize: "13px" }}>Role</button>
+                        <button className="btn-primary" onClick={() => deleteUser(user.id)} style={{ background: "var(--danger)", padding: "6px 12px", fontSize: "13px" }}>Delete</button>
+                      </div>
                     )}
                   </td>
+                  
                 </tr>
               ))}
             </tbody>
@@ -253,79 +158,5 @@ function AdminUsers() {
     </div>
   );
 }
-
-/* ================= STYLE ================= */
-
-const container = {
-  padding: "40px",
-  background: "#020617",
-  minHeight: "100vh",
-  color: "white",
-};
-
-const title = {
-  fontSize: "28px",
-  marginBottom: "20px",
-};
-
-const card = {
-  background: "#111827",
-  padding: "20px",
-  borderRadius: "12px",
-};
-
-const table = {
-  width: "100%",
-  borderCollapse: "collapse",
-};
-
-const th = {
-  textAlign: "left",
-  padding: "12px",
-  borderBottom: "1px solid #374151",
-};
-
-const td = {
-  padding: "12px",
-};
-
-const input = {
-  padding: "6px",
-  borderRadius: "6px",
-  border: "1px solid #374151",
-  background: "#020617",
-  color: "white",
-};
-
-const btnPrimary = {
-  background: "#3b82f6",
-  color: "white",
-  padding: "6px 10px",
-  borderRadius: "6px",
-  marginRight: "6px",
-};
-
-const btnSecondary = {
-  background: "#6b7280",
-  color: "white",
-  padding: "6px 10px",
-  borderRadius: "6px",
-};
-
-const btnRole = {
-  background: "#22c55e",
-  color: "white",
-  padding: "6px 10px",
-  borderRadius: "6px",
-  marginLeft: "6px",
-};
-
-const btnDanger = {
-  background: "#ef4444",
-  color: "white",
-  padding: "6px 10px",
-  borderRadius: "6px",
-  marginLeft: "6px",
-};
 
 export default AdminUsers;
