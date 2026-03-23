@@ -3,111 +3,144 @@ import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
 
 function ResetPassword() {
+  const navigate = useNavigate();
+
+  /* ================= STATE ================= */
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ text: "", type: "" });
 
-  const navigate = useNavigate();
-
-  /* ================= CHECK LINK ================= */
+  /* ================= CHECK LINK & SESSION ================= */
   useEffect(() => {
     const hash = window.location.hash;
 
-    // 🔥 ถ้า link มี error (expired / invalid)
+    // 🔥 ตรวจสอบว่าลิงก์ Error หรือหมดอายุหรือไม่
     if (hash.includes("error")) {
-      alert("ลิงก์หมดอายุ หรือไม่ถูกต้อง");
-      navigate("/forgot-password");
+      setMessage({ text: "⚠️ ลิงก์หมดอายุหรือไม่ถูกต้อง กรุณาขอลิงก์ใหม่", type: "error" });
+      setTimeout(() => navigate("/forgot-password"), 3000); // พากลับไปขอใหม่ใน 3 วินาที
       return;
     }
 
-    // 🔥 ตรวจ session
+    // 🔥 ตรวจสอบ Session ว่าผู้ใช้คลิกมาจากอีเมลจริงไหม
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
 
       if (!data.session) {
-        alert("ลิงก์ไม่ถูกต้อง กรุณาขอใหม่");
-        navigate("/forgot-password");
+        setMessage({ text: "⚠️ ไม่พบสิทธิ์ในการเปลี่ยนรหัสผ่าน กรุณาขอลิงก์ใหม่", type: "error" });
+        setTimeout(() => navigate("/forgot-password"), 3000);
       }
     };
 
     checkSession();
-  }, []);
+  }, [navigate]);
 
   /* ================= UPDATE PASSWORD ================= */
   const updatePassword = async () => {
     if (!password || !confirmPassword) {
-      alert("กรุณากรอกรหัสผ่าน");
+      setMessage({ text: "⚠️ กรุณากรอกรหัสผ่านให้ครบทั้งสองช่อง", type: "error" });
       return;
     }
 
     if (password.length < 6) {
-      alert("รหัสผ่านต้องอย่างน้อย 6 ตัว");
+      setMessage({ text: "⚠️ รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร", type: "error" });
       return;
     }
 
     if (password !== confirmPassword) {
-      alert("รหัสผ่านไม่ตรงกัน");
+      setMessage({ text: "⚠️ รหัสผ่านใหม่และการยืนยันรหัสผ่านไม่ตรงกัน", type: "error" });
       return;
     }
 
     try {
       setLoading(true);
+      setMessage({ text: "", type: "" }); // เคลียร์ข้อความเก่า
 
       const { error } = await supabase.auth.updateUser({
         password: password,
       });
 
       if (error) {
-        alert(error.message);
+        setMessage({ text: `❌ ${error.message}`, type: "error" });
       } else {
-        alert("เปลี่ยนรหัสผ่านสำเร็จ 🎉");
-        navigate("/login");
+        setMessage({ 
+          text: "🎉 เปลี่ยนรหัสผ่านสำเร็จ! กำลังพากลับไปหน้าเข้าสู่ระบบ...", 
+          type: "success" 
+        });
+        
+        // หน่วงเวลา 2.5 วินาทีให้ผู้ใช้อ่านข้อความ แล้วพาไปหน้า Login
+        setTimeout(() => navigate("/login"), 2500);
       }
     } catch (err) {
       console.log(err);
-      alert("เกิดข้อผิดพลาด");
+      setMessage({ text: "❌ เกิดข้อผิดพลาดของระบบ กรุณาลองใหม่อีกครั้ง", type: "error" });
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   /* ================= UI ================= */
-
   return (
-    <div style={container}>
-      <div style={card}>
-        <h2 style={title}>🔐 Reset Password</h2>
+    <div style={styles.page}>
+      <div style={styles.card}>
+        
+        {/* ICON & HEADER */}
+        <div style={styles.iconWrapper}>
+          <span style={styles.icon}>🔑</span>
+        </div>
+        <h2 style={styles.title}>ตั้งรหัสผ่านใหม่</h2>
+        <p style={styles.subtitle}>
+          กรุณาตั้งรหัสผ่านใหม่ของคุณ (ความยาวขั้นต่ำ 6 ตัวอักษร)
+        </p>
 
-        <input
-          type="password"
-          placeholder="รหัสผ่านใหม่"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={input}
-        />
+        {/* INPUTS */}
+        <div style={styles.inputGroup}>
+          <input
+            type="password"
+            placeholder="รหัสผ่านใหม่"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={styles.input}
+          />
+          <input
+            type="password"
+            placeholder="ยืนยันรหัสผ่านใหม่อีกครั้ง"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            style={{ ...styles.input, marginTop: "12px" }}
+          />
+        </div>
 
-        <input
-          type="password"
-          placeholder="ยืนยันรหัสผ่าน"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          style={input}
-        />
+        {/* MESSAGE ALERT */}
+        {message.text && (
+          <div
+            style={message.type === "error" ? styles.errorMsg : styles.successMsg}
+          >
+            {message.text}
+          </div>
+        )}
 
+        {/* SUBMIT BUTTON */}
         <button
           onClick={updatePassword}
-          disabled={loading}
-          style={button}
+          disabled={loading || message.type === "success"}
+          style={
+            loading || message.type === "success" 
+              ? { ...styles.button, ...styles.buttonDisabled } 
+              : styles.button
+          }
         >
-          {loading ? "Updating..." : "Update Password"}
+          {loading ? "กำลังอัปเดตรหัสผ่าน..." : "ยืนยันการเปลี่ยนรหัสผ่าน"}
         </button>
 
+        {/* BACK BUTTON */}
         <button
           onClick={() => navigate("/forgot-password")}
-          style={backBtn}
+          style={styles.backButton}
         >
-          ⬅ ขอ reset ใหม่
+          ⬅ ขอกู้คืนรหัสผ่านใหม่
         </button>
+
       </div>
     </div>
   );
@@ -115,61 +148,121 @@ function ResetPassword() {
 
 /* ================= STYLE ================= */
 
-const container = {
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  height: "100vh",
-  background: "linear-gradient(135deg, #020617, #0f172a)",
-};
-
-const card = {
-  background: "#0f172a",
-  padding: "40px",
-  borderRadius: "16px",
-  width: "360px",
-  textAlign: "center",
-  boxShadow: "0 10px 30px rgba(0,0,0,0.6)",
-};
-
-const title = {
-  marginBottom: "20px",
-  color: "#e2e8f0",
-};
-
-const input = {
-  display: "block",
-  padding: "12px",
-  width: "100%",
-  marginTop: "10px",
-  borderRadius: "8px",
-  border: "1px solid #334155",
-  background: "#020617",
-  color: "white",
-  outline: "none",
-};
-
-const button = {
-  marginTop: "20px",
-  padding: "12px",
-  width: "100%",
-  background: "#22c55e",
-  color: "white",
-  border: "none",
-  borderRadius: "8px",
-  cursor: "pointer",
-  fontWeight: "bold",
-};
-
-const backBtn = {
-  marginTop: "10px",
-  padding: "10px",
-  width: "100%",
-  background: "#475569",
-  color: "white",
-  border: "none",
-  borderRadius: "8px",
-  cursor: "pointer",
+const styles = {
+  page: {
+    minHeight: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    background: "radial-gradient(circle at center, #0f172a, #020617)",
+    padding: "20px",
+  },
+  card: {
+    width: "100%",
+    maxWidth: "420px",
+    background: "rgba(30, 41, 59, 0.6)",
+    backdropFilter: "blur(25px)",
+    WebkitBackdropFilter: "blur(25px)",
+    padding: "40px 30px",
+    borderRadius: "24px",
+    border: "1px solid rgba(255, 255, 255, 0.08)",
+    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.6)",
+    textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    gap: "18px",
+  },
+  iconWrapper: {
+    width: "70px",
+    height: "70px",
+    background: "rgba(34, 197, 94, 0.1)", // ใช้โทนสีเขียวให้ดูเหมือนการปลดล็อคสำเร็จ
+    borderRadius: "50%",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    margin: "0 auto 5px",
+    border: "1px solid rgba(34, 197, 94, 0.2)",
+  },
+  icon: {
+    fontSize: "30px",
+  },
+  title: {
+    color: "white",
+    fontSize: "26px",
+    fontWeight: "bold",
+    margin: "0",
+  },
+  subtitle: {
+    color: "#94a3b8",
+    fontSize: "14px",
+    lineHeight: "1.6",
+    margin: "0 0 5px 0",
+  },
+  inputGroup: {
+    width: "100%",
+    textAlign: "left",
+  },
+  input: {
+    width: "100%",
+    padding: "15px",
+    borderRadius: "12px",
+    border: "1px solid #334155",
+    background: "#020617",
+    color: "white",
+    fontSize: "15px",
+    outline: "none",
+    boxSizing: "border-box",
+    transition: "0.3s",
+  },
+  button: {
+    width: "100%",
+    padding: "14px",
+    background: "linear-gradient(90deg, #22c55e, #16a34a)", // ปุ่มสีเขียวเด่นๆ
+    color: "white",
+    border: "none",
+    borderRadius: "12px",
+    fontSize: "16px",
+    fontWeight: "bold",
+    cursor: "pointer",
+    transition: "0.3s",
+    boxShadow: "0 10px 20px rgba(34, 197, 94, 0.3)",
+    marginTop: "5px",
+  },
+  buttonDisabled: {
+    background: "#475569",
+    boxShadow: "none",
+    cursor: "not-allowed",
+    opacity: 0.7,
+  },
+  backButton: {
+    background: "transparent",
+    color: "#94a3b8",
+    border: "none",
+    marginTop: "10px",
+    cursor: "pointer",
+    fontSize: "14px",
+    textDecoration: "underline",
+    transition: "0.3s",
+  },
+  errorMsg: {
+    color: "#ef4444",
+    background: "rgba(239, 68, 68, 0.1)",
+    padding: "12px",
+    borderRadius: "8px",
+    fontSize: "14px",
+    border: "1px solid rgba(239, 68, 68, 0.2)",
+    textAlign: "left",
+  },
+  successMsg: {
+    color: "#22c55e",
+    background: "rgba(34, 197, 94, 0.1)",
+    padding: "12px",
+    borderRadius: "8px",
+    fontSize: "14px",
+    border: "1px solid rgba(34, 197, 94, 0.2)",
+    lineHeight: "1.5",
+    textAlign: "left",
+  },
 };
 
 export default ResetPassword;
