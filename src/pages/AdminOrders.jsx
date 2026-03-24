@@ -16,7 +16,12 @@ function AdminOrders() {
     fetchOrders();
   }, []);
 
-  const getSlipUrl = (path) => path ? supabase.storage.from("slips").getPublicUrl(path).data.publicUrl : null;
+  // 🔥 แก้ไขฟังก์ชันนี้: เช็กว่าถ้าเป็นลิงก์เต็มอยู่แล้ว ให้ใช้ได้เลย
+  const getSlipUrl = (path) => {
+    if (!path) return null;
+    if (path.startsWith("http")) return path; 
+    return supabase.storage.from("slips").getPublicUrl(path).data.publicUrl;
+  };
 
   const updateStatus = async (id, newStatus) => {
     setUpdatingId(id);

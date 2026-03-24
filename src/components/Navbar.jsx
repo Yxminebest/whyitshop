@@ -77,18 +77,36 @@ function Navbar({ theme, toggleTheme }) {
           </>
         )}
 
+        {/* ADMIN MENU */}
         {role === "admin" && (
           <>
             <Link to="/admin" className="nav-link" style={{ color: "var(--accent)" }}>Dashboard</Link>
+            <Link to="/admin/users" className="nav-link" style={{ color: "var(--accent)" }}>Users</Link>
+            <Link to="/admin/orders" className="nav-link" style={{ color: "var(--accent)" }}>Manage Orders</Link>
           </>
         )}
 
+        {/* 🔥 AUTH (แสดงชื่อผู้ใช้ + ปุ่ม Logout) */}
         {user ? (
-          <button onClick={logoutUser} className="btn-primary" style={{ background: "var(--danger)" }}>
-            Logout
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "15px", marginLeft: "10px" }}>
+            
+            <span style={{ 
+              color: "var(--text-muted)", 
+              fontSize: "14px", 
+              fontWeight: "600",
+              borderRight: "2px solid var(--card-border)", /* เส้นคั่นบางๆ */
+              paddingRight: "15px" 
+            }}>
+              👋 {user.user_metadata?.full_name || user.email}
+            </span>
+
+            <button onClick={logoutUser} className="btn-primary" style={{ background: "var(--danger)", padding: "8px 15px" }}>
+              Logout
+            </button>
+
+          </div>
         ) : (
-          <Link to="/login" className="btn-primary">Login</Link>
+          <Link to="/login" className="btn-primary" style={{ padding: "8px 15px", marginLeft: "10px" }}>Login</Link>
         )}
       </div>
     </nav>

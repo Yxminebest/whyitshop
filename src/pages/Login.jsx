@@ -4,11 +4,14 @@ import { useNavigate, Link } from "react-router-dom";
 
 function Login() {
   const navigate = useNavigate();
+
+  /* ================= STATE ================= */
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  /* ================= CREATE USER ================= */
   const createUserIfNotExists = async (user) => {
     try {
       const { data } = await supabase.from("users").select("id").eq("id", user.id).maybeSingle();
@@ -18,18 +21,21 @@ function Login() {
     }
   };
 
+  /* ================= GET ROLE ================= */
   const getUserRole = async (userId) => {
     const { data, error } = await supabase.from("users").select("role").eq("id", userId).single();
     if (error) return "user";
     return data?.role || "user";
   };
 
+  /* ================= EMAIL LOGIN ================= */
   const handleLogin = async () => {
     if (!email || !password) return alert("กรุณากรอกข้อมูลให้ครบ");
     try {
       setLoading(true);
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) return alert(error.message);
+      
+      if (error) return alert("❌ " + error.message);
 
       const user = data.user;
       await createUserIfNotExists(user);
@@ -37,12 +43,13 @@ function Login() {
 
       navigate(role === "admin" ? "/admin" : "/");
     } catch (err) {
-      alert("เกิดข้อผิดพลาด");
+      alert("เกิดข้อผิดพลาดของระบบ");
     } finally {
       setLoading(false);
     }
   };
 
+  /* ================= GOOGLE LOGIN ================= */
   const handleGoogleLogin = async () => {
     try {
       setGoogleLoading(true);
@@ -50,7 +57,7 @@ function Login() {
         provider: "google",
         options: { redirectTo: window.location.origin },
       });
-      if (error) alert(error.message);
+      if (error) alert("❌ " + error.message);
     } catch (err) {
       alert("Google login ล้มเหลว");
     } finally {
@@ -58,31 +65,53 @@ function Login() {
     }
   };
 
+  /* ================= UI ================= */
   return (
     <div className="page-container" style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
-      <div className="glass-card" style={{ width: "100%", maxWidth: "420px", display: "flex", flexDirection: "column", gap: "18px" }}>
+      <div className="glass-card" style={{ width: "100%", maxWidth: "420px", display: "flex", flexDirection: "column", gap: "18px", textAlign: "center" }}>
         
-        <h1 style={{ textAlign: "center", marginBottom: "10px" }}>Welcome Back 👋</h1>
+        <h1 style={{ marginBottom: "10px", fontSize: "28px" }}>Welcome Back 👋</h1>
 
-        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-glass" />
-        <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="input-glass" />
+        {/* INPUTS */}
+        <input 
+          type="email" 
+          placeholder="Email" 
+          value={email} 
+          onChange={(e) => setEmail(e.target.value)} 
+          className="input-glass"
+          style={{ textAlign: "left" }}
+        />
+        <input 
+          type="password" 
+          placeholder="Password" 
+          value={password} 
+          onChange={(e) => setPassword(e.target.value)} 
+          className="input-glass"
+          style={{ textAlign: "left" }}
+        />
 
         <div style={{ textAlign: "right", marginTop: "-10px", marginBottom: "10px" }}>
-          <Link to="/forgot-password" style={{ color: "var(--primary)", fontSize: "14px", textDecoration: "none" }}>Forgot Password?</Link>
+          <Link to="/forgot-password" style={{ color: "var(--primary)", fontSize: "14px", textDecoration: "none", fontWeight: "bold" }}>
+            Forgot Password?
+          </Link>
         </div>
 
-        <button onClick={handleLogin} disabled={loading} className="btn-primary" style={{ padding: "14px" }}>
+        {/* BUTTONS */}
+        <button onClick={handleLogin} disabled={loading} className="btn-primary" style={{ padding: "14px", fontSize: "16px" }}>
           {loading ? "Loading..." : "Login"}
         </button>
 
-        <button onClick={() => navigate("/register")} className="btn-success" style={{ padding: "14px" }}>
+        <button onClick={() => navigate("/register")} className="btn-success" style={{ padding: "14px", fontSize: "16px" }}>
           Register
         </button>
 
-        <div style={{ textAlign: "center", color: "var(--text-muted)", fontSize: "14px", margin: "10px 0" }}>or</div>
+        <div style={{ color: "var(--text-muted)", fontSize: "14px", margin: "10px 0", fontWeight: "bold" }}>
+          — OR —
+        </div>
 
-        <button onClick={handleGoogleLogin} disabled={googleLoading} className="btn-primary" style={{ background: "var(--bg-secondary)", color: "var(--text-main)", border: "1px solid var(--card-border)" }}>
-          {googleLoading ? "Connecting..." : "🔵 Continue with Google"}
+        <button onClick={handleGoogleLogin} disabled={googleLoading} className="btn-primary" style={{ background: "var(--bg-secondary)", color: "var(--text-main)", border: "1px solid var(--card-border)", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", padding: "12px" }}>
+          <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" style={{ width: "20px" }} />
+          {googleLoading ? "Connecting..." : "Continue with Google"}
         </button>
         
       </div>
