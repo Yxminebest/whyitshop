@@ -28,9 +28,6 @@ function Home() {
       {/* HERO SECTION */}
       <div className="hero">
         <h1 className="text-gradient">WHY IT Shop</h1>
-        <p style={{ color: "var(--text-muted)", marginTop: "10px", fontSize: "18px" }}>
-          Premium Gaming & IT Gear สำหรับสายเกมและมืออาชีพ
-        </p>
       </div>
 
       {/* CATEGORY */}

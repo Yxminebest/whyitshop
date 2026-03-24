@@ -1,79 +1,48 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
 import { Navigate } from "react-router-dom";
+import { supabase } from "../lib/supabase";
 
 function AdminRoute({ children }) {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    let isMounted = true;
-
     const checkAdmin = async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (!isMounted) return;
+        const { data: sessionData } = await supabase.auth.getSession();
+        const user = sessionData?.session?.user;
 
         if (!user) {
-          setUser(null);
           setIsAdmin(false);
+          setLoading(false);
           return;
         }
 
-        setUser(user);
-
-        const { data, error } = await supabase
-          .from("users")
-          .select("role")
-          .eq("id", user.id)
-          .single();
-
-        if (error) {
-          console.error("Role error:", error);
-          setIsAdmin(false);
-          return;
-        }
-
+        const { data } = await supabase.from("users").select("role").eq("id", user.id).single();
         setIsAdmin(data?.role === "admin");
-      } catch (err) {
-        console.error("Admin check error:", err);
+      } catch (error) {
+        console.error("Admin check error:", error);
         setIsAdmin(false);
       } finally {
-        if (isMounted) setLoading(false);
+        // 🔥 ปิดโหลดเสมอไม่ว่าจะเช็กผ่านหรือไม่ผ่าน
+        setLoading(false); 
       }
     };
 
     checkAdmin();
-
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
-  /* ================= LOADING ================= */
   if (loading) {
     return (
-      <p style={{ color: "white", padding: "40px" }}>
-        Checking admin permission...
-      </p>
+      <div className="page-container" style={{ textAlign: "center", marginTop: "100px" }}>
+        <h2 style={{ color: "var(--primary)" }}>กำลังตรวจสอบสิทธิ์ผู้ดูแลระบบ... 🛡️</h2>
+      </div>
     );
   }
 
-  /* ================= NOT LOGIN ================= */
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
+  // ถ้าไม่ใช่แอดมิน ให้เด้งกลับไปหน้าแรก
+  if (!isAdmin) return <Navigate to="/" />;
 
-  /* ================= NOT ADMIN ================= */
-  if (!isAdmin) {
-    return <Navigate to="/" replace />;
-  }
-
-  /* ================= OK ================= */
   return children;
 }
 

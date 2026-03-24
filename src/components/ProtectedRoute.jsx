@@ -1,40 +1,37 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
 import { Navigate } from "react-router-dom";
+import { supabase } from "../lib/supabase";
 
 function ProtectedRoute({ children }) {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const checkUser = async () => {
+    const checkSession = async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        setUser(user);
-      } catch (err) {
-        console.error(err);
+        const { data } = await supabase.auth.getSession();
+        setUser(data?.session?.user || null);
+      } catch (error) {
+        console.error("Auth check error:", error);
       } finally {
+        // 🔥 บรรทัดนี้สำคัญมาก! เช็กเสร็จแล้วต้องสั่งปิดโหลด ไม่งั้นค้าง
         setLoading(false);
       }
     };
-
-    checkUser();
+    
+    checkSession();
   }, []);
 
   if (loading) {
     return (
-      <p style={{ color: "white", padding: "40px" }}>
-        Checking login...
-      </p>
+      <div className="page-container" style={{ textAlign: "center", marginTop: "100px" }}>
+        <h2 style={{ color: "var(--text-muted)" }}>กำลังตรวจสอบสิทธิ์การเข้าถึง... ⏳</h2>
+      </div>
     );
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
+  // ถ้าเช็กแล้วไม่พบผู้ใช้ ให้เด้งกลับไปหน้า Login
+  if (!user) return <Navigate to="/login" />;
 
   return children;
 }
