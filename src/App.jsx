@@ -28,6 +28,7 @@ import MyOrders from "./pages/MyOrders";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminUsers from "./pages/AdminUsers";
 import AdminOrders from "./pages/AdminOrders";
+import AdminLogs from "./pages/AdminLogs";
 
 function App() {
   /* ================= THEME STATE ================= */
@@ -89,6 +90,7 @@ function App() {
           <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
           <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
           <Route path="/admin/orders" element={<AdminRoute><AdminOrders /></AdminRoute>} />
+          <Route path="/admin/logs" element={<AdminRoute><AdminLogs /></AdminRoute>} />
         </Routes>
       </div>
     </Router>
