@@ -6,61 +6,83 @@ function MyOrders() {
   const [loading, setLoading] = useState(true);
   const [selectedSlip, setSelectedSlip] = useState(null);
 
-  const statusSteps = ["pending", "paid", "shipped", "completed"];
-
   useEffect(() => {
-    fetchOrders();
+    const fetchMyOrders = async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const currentUser = sessionData?.session?.user;
+
+        if (!currentUser) {
+          setLoading(false);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("orders")
+          .select(`*, order_items (*)`)
+          .eq("user_id", currentUser.id)
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+        setOrders(data || []);
+      } catch (err) {
+        console.error("Fetch orders error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMyOrders();
   }, []);
 
-  const fetchOrders = async () => {
-    try {
-      setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data } = await supabase.from("orders")
-        .select(`*, order_items (*)`)
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      setOrders(data || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // 🔥 ฟังก์ชันแก้บั๊กรูปแตก: ดึง Public URL ของสลิป
   const getSlipUrl = (path) => {
     if (!path) return null;
+    if (path.startsWith("http")) return path; 
     return supabase.storage.from("slips").getPublicUrl(path).data.publicUrl;
   };
 
-  const renderTimeline = (status) => {
-    if (status === "cancelled") {
-      return (
-        <div style={{ padding: "12px 20px", background: "rgba(239, 68, 68, 0.1)", color: "var(--danger)", border: "1px solid var(--danger)", borderRadius: "10px", fontWeight: "bold", margin: "20px 0", display: "inline-block" }}>
-          ❌ ออเดอร์นี้ถูกยกเลิกแล้ว
-        </div>
-      );
+  // 🎨 ฟังก์ชันสร้าง Timeline สถานะออเดอร์ (ดีไซน์พรีเมียม)
+  const renderTimeline = (currentStatus) => {
+    const steps = [
+      { id: 'pending', label: 'PENDING' },
+      { id: 'paid', label: 'PAID' },
+      { id: 'shipped', label: 'SHIPPED' },
+      { id: 'completed', label: 'COMPLETED' }
+    ];
+
+    if (currentStatus === 'cancelled') {
+       return <div style={{ color: 'var(--danger)', fontWeight: 'bold', fontSize: '16px', marginTop: '10px' }}>❌ ออเดอร์ถูกยกเลิก (CANCELLED)</div>
     }
 
-    const currentIndex = statusSteps.indexOf(status);
+    const currentIndex = steps.findIndex(s => s.id === currentStatus);
 
     return (
-      <div style={{ display: "flex", alignItems: "center", margin: "25px 0", flexWrap: "wrap" }}>
-        {statusSteps.map((step, index) => {
-          const active = index <= currentIndex;
-          const isLast = index === statusSteps.length - 1;
-
+      <div style={{ display: 'flex', alignItems: 'center', marginTop: '15px', marginBottom: '25px', overflowX: 'auto' }}>
+        {steps.map((step, index) => {
+          const isCompleted = index <= currentIndex;
+          const isLast = index === steps.length - 1;
           return (
-            <div key={step} style={{ display: "flex", alignItems: "center" }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-                <div style={{ width: "16px", height: "16px", borderRadius: "50%", background: active ? "var(--accent)" : "var(--text-muted)", transition: "0.3s", boxShadow: active ? "0 0 12px var(--accent)" : "none" }} />
-                <span style={{ fontSize: "12px", fontWeight: "bold", color: active ? "var(--accent)" : "var(--text-muted)" }}>{step.toUpperCase()}</span>
+            <div key={step.id} style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                <div style={{ 
+                  width: '16px', height: '16px', borderRadius: '50%', 
+                  background: isCompleted ? 'var(--accent)' : 'var(--text-muted)',
+                  opacity: isCompleted ? 1 : 0.3,
+                  boxShadow: isCompleted ? '0 0 10px var(--accent)' : 'none'
+                }} />
+                <span style={{ fontSize: '12px', fontWeight: 'bold', color: isCompleted ? 'var(--accent)' : 'var(--text-muted)', opacity: isCompleted ? 1 : 0.5 }}>
+                  {step.label}
+                </span>
               </div>
               {!isLast && (
-                <div style={{ width: "50px", height: "3px", margin: "0 10px", transform: "translateY(-12px)", background: active ? "var(--accent)" : "var(--card-border)", transition: "0.3s" }} />
+                <div style={{ 
+                  height: '2px', width: '60px', 
+                  background: index < currentIndex ? 'var(--accent)' : 'var(--text-muted)',
+                  opacity: index < currentIndex ? 1 : 0.3,
+                  margin: '0 10px',
+                  transform: 'translateY(-10px)'
+                }} />
               )}
             </div>
           );
@@ -71,58 +93,97 @@ function MyOrders() {
 
   return (
     <div className="page-container">
-      <h1 style={{ marginBottom: "30px", fontWeight: "800" }}>🧾 ประวัติการสั่งซื้อ</h1>
-
       {loading ? (
-        <p style={{ textAlign: "center", marginTop: "50px", color: "var(--text-muted)" }}>กำลังโหลดข้อมูล...</p>
+        <p style={{ textAlign: "center", color: "var(--text-muted)", marginTop: "50px" }}>กำลังโหลดข้อมูลออเดอร์...</p>
       ) : orders.length === 0 ? (
-        <div className="glass-card" style={{ textAlign: "center", padding: "50px 20px" }}>
-          <h3 style={{ color: "var(--text-muted)", fontWeight: "normal" }}>คุณยังไม่มีประวัติการสั่งซื้อ 🛒</h3>
+        <div style={{ textAlign: "center", padding: "50px" }} className="glass-card">
+          <p style={{ fontSize: "18px", color: "var(--text-muted)" }}>คุณยังไม่มีประวัติการสั่งซื้อ</p>
         </div>
       ) : (
-        orders.map((order) => {
-          const slipUrl = getSlipUrl(order.slip);
-          const orderDate = new Date(order.created_at).toLocaleString("th-TH");
+        <div style={{ display: "flex", flexDirection: "column", gap: "30px" }}>
+          {orders.map((order) => {
+            const slipUrl = getSlipUrl(order.slip);
+            return (
+              <div key={order.id} style={{ paddingBottom: "30px", borderBottom: "1px solid var(--card-border)" }}>
+                
+                {/* Header (เลขที่ออเดอร์ & วันที่) */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
+                  <h3 style={{ fontSize: "18px", fontWeight: "bold" }}>Order #{order.id.slice(0, 8).toUpperCase()}</h3>
+                  <p style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+                    {new Date(order.created_at).toLocaleString("th-TH")}
+                  </p>
+                </div>
 
-          return (
-            <div key={order.id} className="glass-card" style={{ marginBottom: "25px", padding: "30px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--card-border)", paddingBottom: "15px", marginBottom: "20px" }}>
-                <h3 style={{ fontSize: "18px" }}>Order #{order.id.slice(0, 8).toUpperCase()}</h3>
-                <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>{orderDate}</span>
-              </div>
+                {/* Timeline & ยอดรวม */}
+                <div style={{ marginBottom: "20px" }}>
+                   <h3 style={{ fontSize: '18px', color: 'var(--accent)', marginBottom: '15px' }}>💰 ยอดรวม: {order.total_price.toLocaleString()} บาท</h3>
+                   {renderTimeline(order.status)}
+                </div>
 
-              <p style={{ color: "var(--accent)", fontSize: "20px", fontWeight: "bold", marginBottom: "10px" }}>💰 ยอดรวม: {order.total_price} บาท</p>
-
-              {renderTimeline(order.status)}
-
-              <div style={{ background: "var(--bg-secondary)", padding: "20px", borderRadius: "12px", marginTop: "20px", border: "1px solid var(--card-border)" }}>
-                <strong style={{ display: "block", marginBottom: "15px" }}>รายการสินค้า:</strong>
-                {order.order_items?.map((item) => (
-                  <div key={item.id} style={{ background: "var(--card-bg)", padding: "12px 15px", marginBottom: "10px", borderRadius: "8px", borderLeft: "4px solid var(--primary)" }}>
-                    🛍 {item.name || `รหัสสินค้า: ${item.product_id}`}
-                    <div style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "5px", marginLeft: "24px" }}>
-                      {item.price} บาท × {item.quantity} ชิ้น
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "20px" }}>
+                  
+                  {/* กล่องรายการสินค้า */}
+                  <div style={{ flex: 2, minWidth: "250px" }}>
+                    <strong style={{ display: "block", marginBottom: "10px", fontSize: "15px" }}>รายการสินค้า:</strong>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {order.order_items?.map((item) => (
+                        <div key={item.id} style={{ 
+                          background: 'rgba(0,0,0,0.1)', padding: '15px', borderRadius: '10px', 
+                          borderLeft: '4px solid var(--primary)', display: "flex", justifyContent: "space-between" 
+                        }}>
+                          <div>
+                            <span style={{ fontSize: "14px", fontWeight: 'bold', display: "block" }}>🛒 {item.name || `Product ID: ${item.product_id}`}</span>
+                            <span style={{ fontSize: "12px", color: 'var(--text-muted)' }}>{item.price.toLocaleString()} บาท × {item.quantity} ชิ้น</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
 
-              <div style={{ background: "var(--bg-secondary)", padding: "20px", borderRadius: "12px", marginTop: "20px", border: "1px solid var(--card-border)" }}>
-                <strong style={{ display: "block", marginBottom: "10px" }}>หลักฐานการโอนเงิน:</strong>
-                {slipUrl ? (
-                  <img src={slipUrl} alt="slip" onClick={() => setSelectedSlip(slipUrl)} style={{ width: "120px", height: "180px", objectFit: "cover", borderRadius: "10px", cursor: "pointer", border: "2px solid var(--card-border)", transition: "0.2s" }} />
-                ) : (
-                  <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>ไม่มีสลิปแนบมา</p>
-                )}
+                  {/* กล่องรูปสลิป */}
+                  <div style={{ flex: 1, minWidth: "150px" }}>
+                    <strong style={{ display: "block", marginBottom: "10px", fontSize: "15px" }}>หลักฐานการโอนเงิน:</strong>
+                    <div style={{ background: 'rgba(0,0,0,0.1)', padding: '15px', borderRadius: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: "100px" }}>
+                      {slipUrl ? (
+                        <img 
+                          src={slipUrl} 
+                          alt="slip" 
+                          onClick={() => setSelectedSlip(slipUrl)}
+                          style={{ 
+                            width: "100%", maxWidth: "120px", height: "150px", 
+                            objectFit: "cover", borderRadius: "8px", 
+                            cursor: "pointer", border: "1px solid var(--card-border)",
+                            transition: "0.3s"
+                          }} 
+                          onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
+                          onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+                        />
+                      ) : (
+                        <div style={{ color: "var(--danger)", fontSize: "14px" }}>
+                          ไม่พบสลิป
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
               </div>
-            </div>
-          );
-        })
+            );
+          })}
+        </div>
       )}
 
+      {/* Modal ซูมรูปสลิป */}
       {selectedSlip && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.85)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999, cursor: "pointer" }} onClick={() => setSelectedSlip(null)}>
-          <img src={selectedSlip} alt="slip full" style={{ maxWidth: "90%", maxHeight: "90%", borderRadius: "12px", boxShadow: "0 0 30px rgba(0,0,0,0.8)" }} />
+        <div 
+          style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.85)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999, cursor: "pointer" }} 
+          onClick={() => setSelectedSlip(null)}
+        >
+          <img 
+            src={selectedSlip} 
+            alt="full slip" 
+            style={{ maxWidth: "90%", maxHeight: "90%", borderRadius: "12px", boxShadow: "0 0 40px rgba(0,0,0,0.5)" }} 
+          />
         </div>
       )}
     </div>

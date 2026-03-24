@@ -7,19 +7,37 @@ function ProtectedRoute({ children }) {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
+    let isMounted = true; // ตัวแปรป้องกันบั๊ก React ทำงานซ้อนกัน
+
     const checkSession = async () => {
       try {
+        // 1. ดึงข้อมูล Session ปัจจุบัน
         const { data } = await supabase.auth.getSession();
-        setUser(data?.session?.user || null);
+        if (isMounted) {
+          setUser(data?.session?.user || null);
+          setLoading(false); // ได้ข้อมูลปุ๊บ บังคับปิดโหลดปั๊บ
+        }
       } catch (error) {
         console.error("Auth check error:", error);
-      } finally {
-        // 🔥 บรรทัดนี้สำคัญมาก! เช็กเสร็จแล้วต้องสั่งปิดโหลด ไม่งั้นค้าง
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
-    
+
     checkSession();
+
+    // 2. ตัวช่วยจับตาดู (Listener) เผื่อ getSession ทำงานพลาดหรือค้าง
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (isMounted) {
+        setUser(session?.user || null);
+        setLoading(false); // บังคับปิดโหลดอีกรอบเพื่อความชัวร์
+      }
+    });
+
+    // ล้างข้อมูลเมื่อสลับหน้า (Clean up)
+    return () => {
+      isMounted = false;
+      listener?.subscription.unsubscribe();
+    };
   }, []);
 
   if (loading) {
@@ -30,8 +48,10 @@ function ProtectedRoute({ children }) {
     );
   }
 
-  // ถ้าเช็กแล้วไม่พบผู้ใช้ ให้เด้งกลับไปหน้า Login
-  if (!user) return <Navigate to="/login" />;
+  // ถ้าเช็กแล้วไม่มี User ให้เด้งไปหน้า Login แบบห้ามกด Back กลับมาหน้าเดิม
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
   return children;
 }

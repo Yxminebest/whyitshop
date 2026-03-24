@@ -55,60 +55,67 @@ function Navbar({ theme, toggleTheme }) {
 
   return (
     <nav className="navbar">
-      <h2 style={{ fontWeight: 800, letterSpacing: "-1px" }}>
-        <span style={{ color: "var(--primary)" }}>WHY IT</span> Shop
-      </h2>
+      
+      {/* ================= ฝั่งซ้าย: เมนูทั่วไป ================= */}
+      <div className="nav-left">
+        <Link to="/" className="nav-link">Home</Link>
+        <Link to="/products" className="nav-link">Products</Link>
+        <Link to="/coupons" className="nav-link">Coupons</Link>
+      </div>
 
-      <div className="nav-links">
-        {/* Toggle Theme Button */}
+      {/* ================= ตรงกลาง: โลโก้ ================= */}
+      <div className="nav-center">
+        <Link to="/" style={{ textDecoration: "none" }}>
+          <h2 className="brand-logo">
+            <span style={{ color: "var(--primary)" }}>WHY IT</span>
+            <span style={{ color: "var(--text-main)", marginLeft: "6px" }}>Shop</span>
+          </h2>
+        </Link>
+      </div>
+
+      {/* ================= ฝั่งขวา: เมนูแอดมิน / ตะกร้า / ระบบสมาชิก ================= */}
+      <div className="nav-right">
+        
+        {/* เมนูสำหรับ Admin */}
+        {role === "admin" && (
+          <div className="admin-menu-group">
+            <Link to="/admin" className="nav-link admin-link">Dashboard</Link>
+            <Link to="/admin/users" className="nav-link admin-link">Users</Link>
+            <Link to="/admin/orders" className="nav-link admin-link">Manage Orders</Link>
+          </div>
+        )}
+
+        {/* เมนูสำหรับลูกค้าธรรมดา */}
+        {user && role !== "admin" && (
+           <Link to="/my-orders" className="nav-link">My Orders</Link>
+        )}
+
+        {/* ตะกร้าสินค้า */}
+        <Link to="/cart" className="nav-link cart-badge">
+          🛒 Cart <span className="cart-count">{totalQty}</span>
+        </Link>
+
+        {/* ปุ่มสลับโหมด */}
         <button className="theme-toggle" onClick={toggleTheme} title="Switch Theme">
           {theme === "light" ? "🌙" : "☀️"}
         </button>
 
-        <Link to="/" className="nav-link">Home</Link>
-        <Link to="/products" className="nav-link">Products</Link>
-        <Link to="/coupons" className="nav-link">Coupons</Link>
-        <Link to="/cart" className="nav-link">🛒 ({totalQty})</Link>
-
-        {user && (
-          <>
-            <Link to="/profile" className="nav-link">Profile</Link>
-            <Link to="/my-orders" className="nav-link">Orders</Link>
-          </>
-        )}
-
-        {/* ADMIN MENU */}
-        {role === "admin" && (
-          <>
-            <Link to="/admin" className="nav-link" style={{ color: "var(--accent)" }}>Dashboard</Link>
-            <Link to="/admin/users" className="nav-link" style={{ color: "var(--accent)" }}>Users</Link>
-            <Link to="/admin/orders" className="nav-link" style={{ color: "var(--accent)" }}>Manage Orders</Link>
-          </>
-        )}
-
-        {/* 🔥 AUTH (แสดงชื่อผู้ใช้ + ปุ่ม Logout) */}
+        {/* โปรไฟล์ และ ปุ่ม Login/Logout */}
         {user ? (
-          <div style={{ display: "flex", alignItems: "center", gap: "15px", marginLeft: "10px" }}>
-            
-            <span style={{ 
-              color: "var(--text-muted)", 
-              fontSize: "14px", 
-              fontWeight: "600",
-              borderRight: "2px solid var(--card-border)", /* เส้นคั่นบางๆ */
-              paddingRight: "15px" 
-            }}>
-              👋 {user.user_metadata?.full_name || user.email}
-            </span>
-
-            <button onClick={logoutUser} className="btn-primary" style={{ background: "var(--danger)", padding: "8px 15px" }}>
-              Logout
-            </button>
-
+          <div className="user-profile-group">
+            <Link to="/profile" className="user-profile-link" title="Profile">
+              <span style={{ fontSize: "16px" }}>👋</span>
+              <span className="user-name-text">
+                {user.user_metadata?.full_name || user.email.split("@")[0]}
+              </span>
+            </Link>
+            <button onClick={logoutUser} className="btn-logout">Logout</button>
           </div>
         ) : (
-          <Link to="/login" className="btn-primary" style={{ padding: "8px 15px", marginLeft: "10px" }}>Login</Link>
+          <Link to="/login" className="btn-primary" style={{ padding: "8px 20px" }}>Login</Link>
         )}
       </div>
+
     </nav>
   );
 }

@@ -1,72 +1,155 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
-import { useNavigate } from "react-router-dom";
-
-const sanitizeInput = (text) => text?.replace(/[<>]/g, "").replace(/script/gi, "").replace(/['"]/g, "") || "";
+import { useNavigate, Link } from "react-router-dom";
 
 function Register() {
   const navigate = useNavigate();
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [newsletter, setNewsletter] = useState(false);
+  
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    username: "",
+    email: "",
+    phone: "",
+    address: "",
+    password: "",
+    confirmPassword: ""
+  });
+  
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const handleRegister = async () => {
-    if (!firstName || !lastName || !username || !email || !password) return alert("กรุณากรอกข้อมูลให้ครบ");
-    if (password.length < 6) return alert("รหัสผ่านต้องอย่างน้อย 6 ตัว");
-    if (password !== confirmPassword) return alert("รหัสผ่านไม่ตรงกัน");
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setErrorMsg("");
+
+    
+    if (
+      !formData.firstName || 
+      !formData.lastName || 
+      !formData.username || 
+      !formData.email || 
+      !formData.phone ||
+      !formData.address ||
+      !formData.password
+    ) {
+      return setErrorMsg("⚠️ กรุณากรอกข้อมูลให้ครบทุกช่อง");
+    }
+
+    // 2. ตรวจสอบรหัสผ่านว่าตรงกันไหม
+    if (formData.password !== formData.confirmPassword) {
+      return setErrorMsg("❌ รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน");
+    }
+
+    // 🔥 3. ระบบตรวจรหัสผ่าน Strong Password
+    // ความหมาย: ยาว 8 ตัวขึ้นไป, มีตัวพิมพ์เล็ก(a-z), ตัวพิมพ์ใหญ่(A-Z), และตัวเลข(0-9)
+    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    
+    if (!strongPasswordRegex.test(formData.password)) {
+      return setErrorMsg("⚠️ รหัสผ่านไม่รัดกุม! ต้องมีอย่างน้อย 8 ตัวอักษร ประกอบด้วยตัวพิมพ์เล็ก ตัวพิมพ์ใหญ่ และตัวเลข");
+    }
 
     try {
       setLoading(true);
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) return alert(error.message);
+      
+      // 4. ส่งข้อมูลไปสมัครสมาชิกในระบบ Auth ของ Supabase
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password, 
+        options: {
+          data: {
+            full_name: `${formData.firstName} ${formData.lastName}`,
+            username: formData.username,
+          }
+        }
+      });
 
-      const user = data?.user || data?.session?.user;
-      if (!user) return alert("สมัครสำเร็จ กรุณายืนยันอีเมลก่อน");
+      if (error) throw error;
 
-      await supabase.from("users").insert([{
-        id: user.id, email, username: sanitizeInput(username), firstname: sanitizeInput(firstName), lastname: sanitizeInput(lastName), newsletter, role: "user"
-      }]);
+      // 5. บันทึกข้อมูลทั้งหมดลงตาราง users
+      if (data?.user) {
+        const { error: dbError } = await supabase.from("users").upsert([
+          { 
+            id: data.user.id, 
+            email: formData.email, 
+            username: formData.username,
+            firstname: formData.firstName,
+            lastname: formData.lastName,
+            phone: formData.phone,
+            address: formData.address,
+            role: "user" 
+          }
+        ]);
+        
+        if (dbError) throw new Error("ฐานข้อมูลปฏิเสธการบันทึก: " + dbError.message);
+      }
 
-      alert("สมัครสมาชิกสำเร็จ 🎉");
-      navigate("/login");
+      alert("🎉 สมัครสมาชิกสำเร็จ! เริ่มต้นใช้งานได้เลยครับ");
+      navigate("/"); // เด้งไปหน้า Home
+
     } catch (err) {
-      alert("เกิดข้อผิดพลาด: " + err.message);
+      setErrorMsg("❌ " + err.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="page-container" style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
-      <div className="glass-card" style={{ width: "100%", maxWidth: "450px", display: "flex", flexDirection: "column", gap: "12px" }}>
+    <div className="page-container" style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "80vh", padding: "40px 20px" }}>
+      <div className="glass-card" style={{ width: "100%", maxWidth: "550px", padding: "40px" }}>
         
-        <h2 style={{ textAlign: "center", marginBottom: "15px" }}>Create Account</h2>
+        <h1 style={{ textAlign: "center", marginBottom: "25px", fontSize: "28px" }}>Create Account 🚀</h1>
 
-        <div style={{ display: "flex", gap: "10px" }}>
-          <input type="text" placeholder="First Name" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="input-glass" />
-          <input type="text" placeholder="Last Name" value={lastName} onChange={(e) => setLastName(e.target.value)} className="input-glass" />
-        </div>
-        
-        <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} className="input-glass" />
-        <input type="email" placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)} className="input-glass" />
-        <input type="password" placeholder="Password (ขั้นต่ำ 6 ตัว)" value={password} onChange={(e) => setPassword(e.target.value)} className="input-glass" />
-        <input type="password" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="input-glass" />
+        {errorMsg && <div style={{ background: "rgba(239, 68, 68, 0.1)", color: "var(--danger)", padding: "12px", borderRadius: "10px", marginBottom: "20px", fontSize: "14px", border: "1px solid rgba(239, 68, 68, 0.2)" }}>{errorMsg}</div>}
 
-        <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--text-muted)", fontSize: "14px", marginTop: "5px", cursor: "pointer" }}>
-          <input type="checkbox" checked={newsletter} onChange={(e) => setNewsletter(e.target.checked)} style={{ width: "18px", height: "18px" }} />
-          Subscribe to Newsletter
-        </label>
+        <form onSubmit={handleRegister} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+          
+          <div style={{ display: "flex", gap: "15px" }}>
+            <input type="text" name="firstName" placeholder="First Name (ชื่อจริง)" value={formData.firstName} onChange={handleChange} className="input-glass" required />
+            <input type="text" name="lastName" placeholder="Last Name (นามสกุล)" value={formData.lastName} onChange={handleChange} className="input-glass" required />
+          </div>
 
-        <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
-          <button onClick={handleRegister} disabled={loading} className="btn-success" style={{ flex: 1 }}>{loading ? "Loading..." : "REGISTER"}</button>
-          <button onClick={() => navigate("/login")} className="btn-primary" style={{ flex: 1, background: "var(--bg-secondary)", color: "var(--text-main)", border: "1px solid var(--card-border)" }}>CANCEL</button>
-        </div>
-        
+          <input type="text" name="username" placeholder="Username (ชื่อผู้ใช้)" value={formData.username} onChange={handleChange} className="input-glass" required />
+          <input type="email" name="email" placeholder="Email Address (อีเมล)" value={formData.email} onChange={handleChange} className="input-glass" required />
+          <input type="text" name="phone" placeholder="Phone Number (เบอร์โทรศัพท์)" value={formData.phone} onChange={handleChange} className="input-glass" required />
+          
+          <textarea 
+            name="address" 
+            placeholder="Shipping Address (ที่อยู่สำหรับจัดส่งสินค้า)" 
+            value={formData.address} 
+            onChange={handleChange} 
+            className="input-glass" 
+            required 
+            style={{ minHeight: "80px", resize: "vertical", fontFamily: "inherit" }} 
+          />
+
+          <div>
+            <input type="password" name="password" placeholder="Password (รหัสผ่าน)" value={formData.password} onChange={handleChange} className="input-glass" required />
+            {/* 🔥 เพิ่มข้อความใบ้ผู้ใช้ใต้ช่องรหัสผ่านให้รู้เงื่อนไข */}
+            <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "5px", marginLeft: "5px" }}>
+              * รหัสผ่านต้องมี 8 ตัวอักษรขึ้นไป, ประกอบด้วย A-Z, a-z และ 0-9
+            </p>
+          </div>
+
+          <input type="password" name="confirmPassword" placeholder="Confirm Password (ยืนยันรหัสผ่าน)" value={formData.confirmPassword} onChange={handleChange} className="input-glass" required />
+
+          <button type="submit" disabled={loading} className="btn-success" style={{ padding: "14px", fontSize: "16px", marginTop: "10px" }}>
+            {loading ? "กำลังสมัครสมาชิก..." : "REGISTER"}
+          </button>
+
+        </form>
+
+        <p style={{ textAlign: "center", marginTop: "20px", color: "var(--text-muted)", fontSize: "14px" }}>
+          มีบัญชีอยู่แล้วใช่ไหม?{" "}
+          <Link to="/login" style={{ color: "var(--primary)", fontWeight: "bold", textDecoration: "none" }}>
+            เข้าสู่ระบบ
+          </Link>
+        </p>
+
       </div>
     </div>
   );
