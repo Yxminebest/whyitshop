@@ -1,112 +1,64 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useContext, useEffect, useState } from "react";
+import { useContext } from "react";
 import { CartContext } from "../context/CartContext";
-import { supabase } from "../lib/supabase";
+import { useAuth } from "../context/AuthContext";
 
 function Navbar({ theme, toggleTheme }) {
   const { cartItems } = useContext(CartContext);
+  const { user, role, logout } = useAuth();
   const navigate = useNavigate();
-
-  const [user, setUser] = useState(null);
-  const [role, setRole] = useState(null);
 
   const totalQty = cartItems.reduce((sum, item) => sum + (item.qty || 1), 0);
 
-  const fetchRole = async (userId) => {
-    try {
-      const { data } = await supabase.from("users").select("role").eq("id", userId).maybeSingle();
-      setRole(data?.role || "user");
-    } catch (err) {
-      setRole("user");
-    }
-  };
-
-  useEffect(() => {
-    let isMounted = true;
-    const loadSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!isMounted) return;
-      const currentUser = data?.session?.user || null;
-      setUser(currentUser);
-      if (currentUser) fetchRole(currentUser.id);
-    };
-
-    loadSession();
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      const currentUser = session?.user || null;
-      setUser(currentUser);
-      if (currentUser) fetchRole(currentUser.id);
-      else setRole(null);
-    });
-
-    return () => {
-      isMounted = false;
-      listener.subscription.unsubscribe();
-    };
-  }, []);
-
-  const logoutUser = async () => {
-    await supabase.auth.signOut();
-    localStorage.clear();
-    sessionStorage.clear();
+  const handleLogout = async () => {
+    await logout();
     navigate("/login");
   };
 
   return (
-    <nav className="navbar">
-      <h2 style={{ fontWeight: 800, letterSpacing: "-1px" }}>
-        <span style={{ color: "var(--primary)" }}>WHY IT</span> Shop
-      </h2>
+    <nav className="navbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px', background: 'var(--bg-nav)', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+        <h2 style={{ fontWeight: 800, margin: 0, cursor: 'pointer' }} onClick={() => navigate('/')}>
+          <span style={{ color: "var(--primary)" }}>WHY IT</span> Shop
+        </h2>
+        
+        <div className="nav-links" style={{ display: 'flex', gap: '15px' }}>
+          <Link to="/" className="nav-link">Home</Link>
+          <Link to="/products" className="nav-link">Products</Link>
+          <Link to="/coupons" className="nav-link">Coupons</Link>
+        </div>
+      </div>
 
-      <div className="nav-links">
-        {/* Toggle Theme Button */}
-        <button className="theme-toggle" onClick={toggleTheme} title="Switch Theme">
+      <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+        <button className="theme-toggle" onClick={toggleTheme} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer' }}>
           {theme === "light" ? "🌙" : "☀️"}
         </button>
 
-        <Link to="/" className="nav-link">Home</Link>
-        <Link to="/products" className="nav-link">Products</Link>
-        <Link to="/coupons" className="nav-link">Coupons</Link>
-        <Link to="/cart" className="nav-link">🛒 ({totalQty})</Link>
+        <Link to="/cart" className="nav-link" style={{ position: 'relative' }}>
+          🛒 <span style={{ background: 'var(--primary)', color: 'white', borderRadius: '50%', padding: '2px 6px', fontSize: '12px' }}>{totalQty}</span>
+        </Link>
 
-        {user && (
-          <>
-            <Link to="/profile" className="nav-link">Profile</Link>
-            <Link to="/my-orders" className="nav-link">Orders</Link>
-          </>
-        )}
-
-        {/* ADMIN MENU */}
-        {role === "admin" && (
-          <>
-            <Link to="/admin" className="nav-link" style={{ color: "var(--accent)" }}>Dashboard</Link>
-            <Link to="/admin/users" className="nav-link" style={{ color: "var(--accent)" }}>Users</Link>
-            <Link to="/admin/orders" className="nav-link" style={{ color: "var(--accent)" }}>Manage Orders</Link>
-          </>
-        )}
-
-        {/* 🔥 AUTH (แสดงชื่อผู้ใช้ + ปุ่ม Logout) */}
         {user ? (
-          <div style={{ display: "flex", alignItems: "center", gap: "15px", marginLeft: "10px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+            <div style={{ height: '24px', width: '2px', background: 'var(--card-border)' }}></div>
             
-            <span style={{ 
-              color: "var(--text-muted)", 
-              fontSize: "14px", 
-              fontWeight: "600",
-              borderRight: "2px solid var(--card-border)", /* เส้นคั่นบางๆ */
-              paddingRight: "15px" 
-            }}>
-              👋 {user.user_metadata?.full_name || user.email}
-            </span>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '14px', fontWeight: '600' }}>👋 {user.user_metadata?.full_name || 'User'}</div>
+              {role === 'admin' && <small style={{ color: 'var(--accent)', display: 'block', fontSize: '10px' }}>ADMIN PANEL</small>}
+            </div>
 
-            <button onClick={logoutUser} className="btn-primary" style={{ background: "var(--danger)", padding: "8px 15px" }}>
-              Logout
-            </button>
-
+            <div className="user-menu" style={{ display: 'flex', gap: '10px' }}>
+              <Link to="/profile" className="nav-link">Profile</Link>
+              {role === "admin" && (
+                <Link to="/admin" className="nav-link" style={{ color: "var(--accent)", fontWeight: 'bold' }}>Admin</Link>
+              )}
+              <button onClick={handleLogout} className="btn-primary" style={{ background: "var(--danger)", border: 'none', borderRadius: '8px', padding: "8px 15px", cursor: 'pointer', color: 'white' }}>
+                Logout
+              </button>
+            </div>
           </div>
         ) : (
-          <Link to="/login" className="btn-primary" style={{ padding: "8px 15px", marginLeft: "10px" }}>Login</Link>
+          <Link to="/login" className="btn-primary" style={{ padding: "8px 20px", borderRadius: '8px', textDecoration: 'none' }}>Login</Link>
         )}
       </div>
     </nav>
