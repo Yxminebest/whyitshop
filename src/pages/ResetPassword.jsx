@@ -15,15 +15,17 @@ function ResetPassword() {
   useEffect(() => {
     const hash = window.location.hash;
 
-    // ตรวจสอบว่าลิงก์ Error หรือหมดอายุหรือไม่
+    // 🔥 ตรวจสอบว่าลิงก์ Error หรือหมดอายุหรือไม่
     if (hash.includes("error")) {
       setMessage({ text: "⚠️ ลิงก์หมดอายุหรือไม่ถูกต้อง กรุณาขอลิงก์ใหม่", type: "error" });
-      setTimeout(() => navigate("/forgot-password"), 3000);
+      setTimeout(() => navigate("/forgot-password"), 3000); // พากลับไปขอใหม่ใน 3 วินาที
       return;
     }
 
+    // 🔥 ตรวจสอบ Session ว่าผู้ใช้คลิกมาจากอีเมลจริงไหม
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
+
       if (!data.session) {
         setMessage({ text: "⚠️ ไม่พบสิทธิ์ในการเปลี่ยนรหัสผ่าน กรุณาขอลิงก์ใหม่", type: "error" });
         setTimeout(() => navigate("/forgot-password"), 3000);
@@ -34,9 +36,7 @@ function ResetPassword() {
   }, [navigate]);
 
   /* ================= UPDATE PASSWORD ================= */
-  const updatePassword = async (e) => {
-    if (e) e.preventDefault(); // ป้องกันหน้า Refresh เมื่อกด Enter
-
+  const updatePassword = async () => {
     if (!password || !confirmPassword) {
       setMessage({ text: "⚠️ กรุณากรอกรหัสผ่านให้ครบทั้งสองช่อง", type: "error" });
       return;
@@ -48,13 +48,13 @@ function ResetPassword() {
     }
 
     if (password !== confirmPassword) {
-      setMessage({ text: "⚠️ รหัสผ่านไม่ตรงกัน", type: "error" });
+      setMessage({ text: "⚠️ รหัสผ่านใหม่และการยืนยันรหัสผ่านไม่ตรงกัน", type: "error" });
       return;
     }
 
     try {
       setLoading(true);
-      setMessage({ text: "", type: "" });
+      setMessage({ text: "", type: "" }); // เคลียร์ข้อความเก่า
 
       const { error } = await supabase.auth.updateUser({
         password: password,
@@ -64,12 +64,15 @@ function ResetPassword() {
         setMessage({ text: `❌ ${error.message}`, type: "error" });
       } else {
         setMessage({ 
-          text: "🎉 เปลี่ยนรหัสผ่านสำเร็จ! ระบบกำลังพากลับไปหน้าเข้าสู่ระบบ...", 
+          text: "🎉 เปลี่ยนรหัสผ่านสำเร็จ! กำลังพากลับไปหน้าเข้าสู่ระบบ...", 
           type: "success" 
         });
+        
+        // หน่วงเวลา 2.5 วินาทีให้ผู้ใช้อ่านข้อความ แล้วพาไปหน้า Login
         setTimeout(() => navigate("/login"), 2500);
       }
     } catch (err) {
+      console.log(err);
       setMessage({ text: "❌ เกิดข้อผิดพลาดของระบบ กรุณาลองใหม่อีกครั้ง", type: "error" });
     } finally {
       setLoading(false);
@@ -78,97 +81,188 @@ function ResetPassword() {
 
   /* ================= UI ================= */
   return (
-    <div className="page-container" style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: '80vh' }}>
-      <form 
-        onSubmit={updatePassword}
-        className="glass-card" 
-        style={{ width: "100%", maxWidth: "420px", textAlign: "center", padding: '40px' }}
-      >
+    <div style={styles.page}>
+      <div style={styles.card}>
         
         {/* ICON & HEADER */}
-        <div style={{ 
-          width: "70px", height: "70px", background: "rgba(34, 197, 94, 0.1)", 
-          borderRadius: "50%", display: "flex", justifyContent: "center", 
-          alignItems: "center", margin: "0 auto 20px", border: "1px solid var(--card-border)" 
-        }}>
-          <span style={{ fontSize: "30px" }}>🔑</span>
+        <div style={styles.iconWrapper}>
+          <span style={styles.icon}>🔑</span>
         </div>
-
-        <h2 style={{ marginBottom: "10px", fontSize: "28px", fontWeight: "800" }}>ตั้งรหัสผ่านใหม่</h2>
-        <p style={{ color: "var(--text-muted)", fontSize: "14px", lineHeight: "1.6", marginBottom: "25px" }}>
-          กรุณาตั้งรหัสผ่านใหม่ของคุณ <br />(ความยาวขั้นต่ำ 6 ตัวอักษร)
+        <h2 style={styles.title}>ตั้งรหัสผ่านใหม่</h2>
+        <p style={styles.subtitle}>
+          กรุณาตั้งรหัสผ่านใหม่ของคุณ (ความยาวขั้นต่ำ 6 ตัวอักษร)
         </p>
 
         {/* INPUTS */}
-        <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '20px' }}>
-          <div>
-            <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)', marginLeft: '5px', display: 'block', marginBottom: '8px' }}>
-              New Password
-            </label>
-            <input
-              type="password"
-              placeholder="รหัสผ่านใหม่"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="input-glass"
-              style={{ marginBottom: 0 }}
-              required
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)', marginLeft: '5px', display: 'block', marginBottom: '8px' }}>
-              Confirm New Password
-            </label>
-            <input
-              type="password"
-              placeholder="ยืนยันรหัสผ่านใหม่อีกครั้ง"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="input-glass"
-              style={{ marginBottom: 0 }}
-              required
-            />
-          </div>
+        <div style={styles.inputGroup}>
+          <input
+            type="password"
+            placeholder="รหัสผ่านใหม่"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={styles.input}
+          />
+          <input
+            type="password"
+            placeholder="ยืนยันรหัสผ่านใหม่อีกครั้ง"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            style={{ ...styles.input, marginTop: "12px" }}
+          />
         </div>
 
         {/* MESSAGE ALERT */}
         {message.text && (
-          <div style={{ 
-            color: message.type === "error" ? "var(--danger)" : "var(--accent)", 
-            background: message.type === "error" ? "rgba(239, 68, 68, 0.1)" : "rgba(34, 197, 94, 0.1)",
-            padding: "15px", borderRadius: "12px", fontSize: "14px", 
-            border: `1px solid ${message.type === "error" ? "rgba(239, 68, 68, 0.2)" : "rgba(34, 197, 94, 0.2)"}`,
-            marginBottom: "20px", textAlign: 'left', lineHeight: "1.5"
-          }}>
+          <div
+            style={message.type === "error" ? styles.errorMsg : styles.successMsg}
+          >
             {message.text}
           </div>
         )}
 
         {/* SUBMIT BUTTON */}
         <button
-          type="submit"
+          onClick={updatePassword}
           disabled={loading || message.type === "success"}
-          className="btn-success"
-          style={{ width: "100%", padding: "14px", fontSize: "16px", fontWeight: "800", opacity: (loading || message.type === "success") ? 0.7 : 1 }}
+          style={
+            loading || message.type === "success" 
+              ? { ...styles.button, ...styles.buttonDisabled } 
+              : styles.button
+          }
         >
-          {loading ? "⌛ กำลังอัปเดต..." : "ยืนยันการเปลี่ยนรหัสผ่าน"}
+          {loading ? "กำลังอัปเดตรหัสผ่าน..." : "ยืนยันการเปลี่ยนรหัสผ่าน"}
         </button>
 
         {/* BACK BUTTON */}
         <button
-          type="button"
           onClick={() => navigate("/forgot-password")}
-          style={{ 
-            background: "transparent", color: "var(--text-muted)", border: "none", 
-            marginTop: "20px", cursor: "pointer", fontSize: "14px", textDecoration: "underline" 
-          }}
+          style={styles.backButton}
         >
           ⬅ ขอกู้คืนรหัสผ่านใหม่
         </button>
 
-      </form>
+      </div>
     </div>
   );
 }
+
+/* ================= STYLE ================= */
+
+const styles = {
+  page: {
+    minHeight: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    background: "radial-gradient(circle at center, #0f172a, #020617)",
+    padding: "20px",
+  },
+  card: {
+    width: "100%",
+    maxWidth: "420px",
+    background: "rgba(30, 41, 59, 0.6)",
+    backdropFilter: "blur(25px)",
+    WebkitBackdropFilter: "blur(25px)",
+    padding: "40px 30px",
+    borderRadius: "24px",
+    border: "1px solid rgba(255, 255, 255, 0.08)",
+    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.6)",
+    textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    gap: "18px",
+  },
+  iconWrapper: {
+    width: "70px",
+    height: "70px",
+    background: "rgba(34, 197, 94, 0.1)", // ใช้โทนสีเขียวให้ดูเหมือนการปลดล็อคสำเร็จ
+    borderRadius: "50%",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    margin: "0 auto 5px",
+    border: "1px solid rgba(34, 197, 94, 0.2)",
+  },
+  icon: {
+    fontSize: "30px",
+  },
+  title: {
+    color: "white",
+    fontSize: "26px",
+    fontWeight: "bold",
+    margin: "0",
+  },
+  subtitle: {
+    color: "#94a3b8",
+    fontSize: "14px",
+    lineHeight: "1.6",
+    margin: "0 0 5px 0",
+  },
+  inputGroup: {
+    width: "100%",
+    textAlign: "left",
+  },
+  input: {
+    width: "100%",
+    padding: "15px",
+    borderRadius: "12px",
+    border: "1px solid #334155",
+    background: "#020617",
+    color: "white",
+    fontSize: "15px",
+    outline: "none",
+    boxSizing: "border-box",
+    transition: "0.3s",
+  },
+  button: {
+    width: "100%",
+    padding: "14px",
+    background: "linear-gradient(90deg, #22c55e, #16a34a)", // ปุ่มสีเขียวเด่นๆ
+    color: "white",
+    border: "none",
+    borderRadius: "12px",
+    fontSize: "16px",
+    fontWeight: "bold",
+    cursor: "pointer",
+    transition: "0.3s",
+    boxShadow: "0 10px 20px rgba(34, 197, 94, 0.3)",
+    marginTop: "5px",
+  },
+  buttonDisabled: {
+    background: "#475569",
+    boxShadow: "none",
+    cursor: "not-allowed",
+    opacity: 0.7,
+  },
+  backButton: {
+    background: "transparent",
+    color: "#94a3b8",
+    border: "none",
+    marginTop: "10px",
+    cursor: "pointer",
+    fontSize: "14px",
+    textDecoration: "underline",
+    transition: "0.3s",
+  },
+  errorMsg: {
+    color: "#ef4444",
+    background: "rgba(239, 68, 68, 0.1)",
+    padding: "12px",
+    borderRadius: "8px",
+    fontSize: "14px",
+    border: "1px solid rgba(239, 68, 68, 0.2)",
+    textAlign: "left",
+  },
+  successMsg: {
+    color: "#22c55e",
+    background: "rgba(34, 197, 94, 0.1)",
+    padding: "12px",
+    borderRadius: "8px",
+    fontSize: "14px",
+    border: "1px solid rgba(34, 197, 94, 0.2)",
+    lineHeight: "1.5",
+    textAlign: "left",
+  },
+};
 
 export default ResetPassword;

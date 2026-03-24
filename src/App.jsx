@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { supabase } from "./lib/supabase";
 
 /* ================= COMPONENTS ================= */
 import Navbar from "./components/Navbar";
@@ -33,7 +34,7 @@ function App() {
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
 
   useEffect(() => {
-    // อัปเดต data-theme เพื่อให้ CSS ทำงาน
+    // อัปเดต data-theme ที่แท็ก <html> เพื่อให้ CSS ทำงาน
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("theme", theme);
   }, [theme]);
@@ -42,60 +43,54 @@ function App() {
     setTheme((prev) => (prev === "light" ? "dark" : "light"));
   };
 
+  /* ================= SYNC USER ================= */
+  useEffect(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === "SIGNED_IN" && session?.user) {
+          const user = session.user;
+          try {
+            const { data } = await supabase.from("users").select("id").eq("id", user.id).maybeSingle();
+            if (!data) {
+              await supabase.from("users").insert([{ id: user.id, email: user.email, role: "user" }]);
+            }
+          } catch (err) {
+            console.error("Sync user error:", err);
+          }
+        }
+      }
+    );
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
   return (
     <Router>
-      {/* ส่งค่า Theme ไปให้ Navbar ใช้งานด้วย */}
       <Navbar theme={theme} toggleTheme={toggleTheme} />
       
-      {/* ส่วนแสดงเนื้อหาหลักของหน้าเว็บ */}
-      <main className="main-content" style={{ minHeight: '80vh', paddingBottom: '40px' }}>
+      {/* เอา style={layout} ออก เพราะเราจัดการด้วย body ใน CSS แล้ว */}
+      <div>
         <Routes>
-          {/* Public Routes - ใครก็เข้าได้ */}
           <Route path="/" element={<Home />} />
           <Route path="/products" element={<Products />} />
           <Route path="/product/:id" element={<ProductDetail />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/coupons" element={<Coupons />} />
 
-          {/* Auth Routes - สำหรับล็อกอิน/สมัครสมาชิก */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 
-          {/* User Routes - ต้องล็อกอินก่อน (ProtectedRoute) */}
-          <Route path="/profile" element={
-            <ProtectedRoute>
-              <Profile />
-            </ProtectedRoute>
-          } />
-          <Route path="/my-orders" element={
-            <ProtectedRoute>
-              <MyOrders />
-            </ProtectedRoute>
-          } />
+          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/my-orders" element={<ProtectedRoute><MyOrders /></ProtectedRoute>} />
 
-          {/* Admin Routes - ต้องเป็น Admin เท่านั้น (AdminRoute) */}
-          <Route path="/admin" element={
-            <AdminRoute>
-              <AdminDashboard />
-            </AdminRoute>
-          } />
-          <Route path="/admin/users" element={
-            <AdminRoute>
-              <AdminUsers />
-            </AdminRoute>
-          } />
-          <Route path="/admin/orders" element={
-            <AdminRoute>
-              <AdminOrders />
-            </AdminRoute>
-          } />
-
-          {/* 404 Page (Optional) - ถ้าหาหน้าไม่เจอให้กลับไปหน้าแรก */}
-          <Route path="*" element={<Home />} />
+          <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+          <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+          <Route path="/admin/orders" element={<AdminRoute><AdminOrders /></AdminRoute>} />
         </Routes>
-      </main>
+      </div>
     </Router>
   );
 }

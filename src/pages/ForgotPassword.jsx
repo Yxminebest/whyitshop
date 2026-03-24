@@ -8,12 +8,10 @@ function ForgotPassword() {
   /* ================= STATE ================= */
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState({ text: "", type: "" });
+  const [message, setMessage] = useState({ text: "", type: "" }); // ใช้จัดการข้อความ Error/Success
 
   /* ================= RESET PASSWORD ================= */
-  const resetPassword = async (e) => {
-    if (e) e.preventDefault(); // ป้องกันการ Refresh หน้าเว็บถ้ากด Enter
-    
+  const resetPassword = async () => {
     if (!email) {
       setMessage({ text: "⚠️ กรุณากรอกอีเมลของคุณ", type: "error" });
       return;
@@ -23,8 +21,8 @@ function ForgotPassword() {
       setLoading(true);
       setMessage({ text: "", type: "" });
 
-      // รองรับ Vercel และ Localhost อัตโนมัติ
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      // 🔥 แก้ไข URL ให้ดึงจากเว็บปัจจุบันอัตโนมัติ (รองรับ Vercel 100%)
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
 
@@ -32,13 +30,14 @@ function ForgotPassword() {
         setMessage({ text: `❌ ${error.message}`, type: "error" });
       } else {
         setMessage({
-          text: "✅ ส่งลิงก์รีเซ็ตรหัสผ่านไปที่อีเมลแล้ว กรุณาตรวจสอบ Inbox ของคุณ (รวมถึงใน Junk Mail)",
+          text: "✅ ส่งลิงก์รีเซ็ตรหัสผ่านไปที่อีเมลแล้ว กรุณาตรวจสอบ Inbox ของคุณ",
           type: "success",
         });
-        setEmail(""); 
+        setEmail(""); // ล้างช่องกรอกอีเมล
       }
     } catch (err) {
-      setMessage({ text: "❌ เกิดข้อผิดพลาดทางเทคนิค กรุณาลองใหม่อีกครั้ง", type: "error" });
+      console.log(err);
+      setMessage({ text: "❌ เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง", type: "error" });
     } finally {
       setLoading(false);
     }
@@ -46,82 +45,172 @@ function ForgotPassword() {
 
   /* ================= UI ================= */
   return (
-    <div className="page-container" style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: '80vh' }}>
-      <form 
-        onSubmit={resetPassword}
-        className="glass-card" 
-        style={{ width: "100%", maxWidth: "420px", textAlign: "center", padding: '40px' }}
-      >
+    <div style={styles.page}>
+      <div style={styles.card}>
         
         {/* ICON & HEADER */}
-        <div style={{ 
-          width: "70px", height: "70px", background: "rgba(56, 189, 248, 0.1)", 
-          borderRadius: "50%", display: "flex", justifyContent: "center", 
-          alignItems: "center", margin: "0 auto 20px", border: "1px solid var(--card-border)" 
-        }}>
-          <span style={{ fontSize: "30px" }}>🔐</span>
+        <div style={styles.iconWrapper}>
+          <span style={styles.icon}>🔐</span>
         </div>
-
-        <h1 style={{ marginBottom: "10px", fontSize: "28px", fontWeight: "800" }}>ลืมรหัสผ่าน?</h1>
-        <p style={{ color: "var(--text-muted)", fontSize: "14px", lineHeight: "1.6", marginBottom: "25px" }}>
+        <h1 style={styles.title}>ลืมรหัสผ่าน?</h1>
+        <p style={styles.subtitle}>
           ไม่ต้องกังวล! เพียงกรอกอีเมลที่คุณใช้สมัครสมาชิก <br />
           เราจะส่งลิงก์สำหรับตั้งค่ารหัสผ่านใหม่ไปให้
         </p>
 
         {/* INPUT */}
-        <div style={{ textAlign: 'left', marginBottom: '20px' }}>
-          <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)', marginLeft: '5px', display: 'block', marginBottom: '8px' }}>
-            Email Address
-          </label>
+        <div style={styles.inputGroup}>
           <input
             type="email"
-            placeholder="example@mail.com"
+            placeholder="กรอกอีเมลของคุณที่นี่..."
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="input-glass"
-            style={{ marginBottom: 0 }}
-            required
+            style={styles.input}
           />
         </div>
 
         {/* MESSAGE ALERT */}
         {message.text && (
-          <div style={{ 
-            color: message.type === "error" ? "var(--danger)" : "var(--accent)", 
-            background: message.type === "error" ? "rgba(239, 68, 68, 0.1)" : "rgba(34, 197, 94, 0.1)",
-            padding: "15px", borderRadius: "12px", fontSize: "14px", 
-            border: `1px solid ${message.type === "error" ? "rgba(239, 68, 68, 0.2)" : "rgba(34, 197, 94, 0.2)"}`,
-            marginBottom: "20px", lineHeight: "1.5"
-          }}>
+          <div
+            style={message.type === "error" ? styles.errorMsg : styles.successMsg}
+          >
             {message.text}
           </div>
         )}
 
         {/* SUBMIT BUTTON */}
         <button
-          type="submit"
+          onClick={resetPassword}
           disabled={loading}
-          className="btn-success"
-          style={{ width: "100%", padding: "14px", fontSize: "16px", fontWeight: "800", opacity: loading ? 0.7 : 1 }}
+          style={loading ? { ...styles.button, ...styles.buttonDisabled } : styles.button}
         >
-          {loading ? "⌛ กำลังส่งลิงก์..." : "ส่งลิงก์รีเซ็ตรหัสผ่าน"}
+          {loading ? "กำลังส่งลิงก์..." : "ส่งลิงก์รีเซ็ตรหัสผ่าน"}
         </button>
 
         {/* BACK BUTTON */}
-        <button 
-          type="button"
-          onClick={() => navigate("/login")} 
-          style={{ 
-            background: "transparent", color: "var(--text-muted)", border: "none", 
-            marginTop: "20px", cursor: "pointer", fontSize: "14px", textDecoration: "underline" 
-          }}
-        >
+        <button onClick={() => navigate("/login")} style={styles.backButton}>
           ⬅ กลับไปหน้าเข้าสู่ระบบ
         </button>
 
-      </form>
+      </div>
     </div>
   );
 }
+
+/* ================= STYLE ================= */
+
+const styles = {
+  page: {
+    minHeight: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    background: "radial-gradient(circle at center, #0f172a, #020617)",
+    padding: "20px",
+  },
+  card: {
+    width: "100%",
+    maxWidth: "420px",
+    background: "rgba(30, 41, 59, 0.6)", // กระจกโปร่งแสง
+    backdropFilter: "blur(25px)",
+    WebkitBackdropFilter: "blur(25px)",
+    padding: "40px 30px",
+    borderRadius: "24px",
+    border: "1px solid rgba(255, 255, 255, 0.08)",
+    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.6)",
+    textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    gap: "18px",
+  },
+  iconWrapper: {
+    width: "70px",
+    height: "70px",
+    background: "rgba(56, 189, 248, 0.1)",
+    borderRadius: "50%",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    margin: "0 auto 5px",
+    border: "1px solid rgba(56, 189, 248, 0.2)",
+  },
+  icon: {
+    fontSize: "30px",
+  },
+  title: {
+    color: "white",
+    fontSize: "26px",
+    fontWeight: "bold",
+    margin: "0",
+  },
+  subtitle: {
+    color: "#94a3b8",
+    fontSize: "14px",
+    lineHeight: "1.6",
+    margin: "0 0 5px 0",
+  },
+  inputGroup: {
+    width: "100%",
+  },
+  input: {
+    width: "100%",
+    padding: "15px",
+    borderRadius: "12px",
+    border: "1px solid #334155",
+    background: "#020617",
+    color: "white",
+    fontSize: "15px",
+    outline: "none",
+    boxSizing: "border-box",
+    transition: "0.3s",
+  },
+  button: {
+    width: "100%",
+    padding: "14px",
+    background: "linear-gradient(90deg, #38bdf8, #2563eb)",
+    color: "white",
+    border: "none",
+    borderRadius: "12px",
+    fontSize: "16px",
+    fontWeight: "bold",
+    cursor: "pointer",
+    transition: "0.3s",
+    boxShadow: "0 10px 20px rgba(37, 99, 235, 0.3)",
+    marginTop: "5px",
+  },
+  buttonDisabled: {
+    background: "#475569",
+    boxShadow: "none",
+    cursor: "not-allowed",
+    opacity: 0.7,
+  },
+  backButton: {
+    background: "transparent",
+    color: "#94a3b8",
+    border: "none",
+    marginTop: "10px",
+    cursor: "pointer",
+    fontSize: "14px",
+    textDecoration: "underline",
+    transition: "0.3s",
+  },
+  errorMsg: {
+    color: "#ef4444",
+    background: "rgba(239, 68, 68, 0.1)",
+    padding: "12px",
+    borderRadius: "8px",
+    fontSize: "14px",
+    border: "1px solid rgba(239, 68, 68, 0.2)",
+  },
+  successMsg: {
+    color: "#22c55e",
+    background: "rgba(34, 197, 94, 0.1)",
+    padding: "12px",
+    borderRadius: "8px",
+    fontSize: "14px",
+    border: "1px solid rgba(34, 197, 94, 0.2)",
+    lineHeight: "1.5",
+  },
+};
 
 export default ForgotPassword;

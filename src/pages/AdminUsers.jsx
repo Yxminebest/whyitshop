@@ -1,183 +1,154 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext"; // 1. นำเข้า useAuth
 
 function AdminUsers() {
   const navigate = useNavigate();
-  const { user: currentUser, role: currentRole, loading: authLoading } = useAuth(); // 2. ดึงค่าจาก Context
-
   const [users, setUsers] = useState([]);
   const [editingUser, setEditingUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 3. ปรับปรุง useEffect ให้ใช้ค่าจาก AuthContext
   useEffect(() => {
-    let isMounted = true;
+    checkAdmin();
+    fetchUsers();
+  }, []);
 
-    if (!authLoading) {
-      if (!currentUser || currentRole !== "admin") {
+  const checkAdmin = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return navigate("/login");
+
+      const { data, error } = await supabase.from("users").select("role").eq("id", user.id).single();
+      if (error || data?.role !== "admin") {
         alert("คุณไม่มีสิทธิ์เข้าถึงหน้านี้ ❌");
         navigate("/");
-        return;
       }
-      fetchUsers(isMounted);
+    } catch (err) {
+      console.error(err);
+      navigate("/");
     }
+  };
 
-    return () => { isMounted = false; };
-  }, [authLoading, currentUser, currentRole, navigate]);
-
-  const fetchUsers = async (isMounted) => {
+  const fetchUsers = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .order("created_at", { ascending: false });
-      
-      if (error) throw error;
-      if (isMounted) setUsers(data || []);
+      const { data, error } = await supabase.from("users").select("*").order("created_at", { ascending: false });
+      if (error) alert("โหลดข้อมูลผู้ใช้ไม่สำเร็จ");
+      else setUsers(data || []);
     } catch (err) {
-      console.error("Fetch error:", err.message);
+      console.error("Fetch error:", err);
     } finally {
-      if (isMounted) setLoading(false);
+      setLoading(false);
     }
   };
 
   const toggleRole = async (id, currentRole) => {
-    if (id === currentUser.id) {
-      alert("❌ คุณไม่สามารถเปลี่ยนสิทธิ์ของตัวเองได้");
-      return;
-    }
-
     const newRole = currentRole === "admin" ? "user" : "admin";
     if (!window.confirm(`ยืนยันการเปลี่ยนสิทธิ์เป็น ${newRole.toUpperCase()}?`)) return;
 
-    try {
-      const { error } = await supabase.from("users").update({ role: newRole }).eq("id", id);
-      if (error) throw error;
-      alert("✅ อัปเดตสิทธิ์เรียบร้อย");
-      fetchUsers(true);
-    } catch (err) {
-      alert("❌ ผิดพลาด: " + err.message);
-    }
+    const { error } = await supabase.from("users").update({ role: newRole }).eq("id", id);
+    if (error) alert("❌ เปลี่ยน Role ไม่สำเร็จ");
+    else fetchUsers();
   };
 
   const deleteUser = async (id) => {
-    if (id === currentUser.id) {
-      alert("❌ คุณไม่สามารถลบตัวเองได้");
-      return;
-    }
-    if (!window.confirm("⚠️ ยืนยันการลบผู้ใช้? ข้อมูลนี้ไม่สามารถกู้คืนได้")) return;
+    if (!window.confirm("⚠️ คุณแน่ใจหรือไม่ที่จะลบผู้ใช้นี้ออกจากระบบ?")) return;
 
-    try {
-      const { error } = await supabase.from("users").delete().eq("id", id);
-      if (error) throw error;
-      alert("✅ ลบผู้ใช้สำเร็จ");
-      fetchUsers(true);
-    } catch (err) {
-      alert("❌ ลบไม่สำเร็จ: " + err.message);
-    }
+    const { error } = await supabase.from("users").delete().eq("id", id);
+    if (error) alert("❌ ลบผู้ใช้ไม่สำเร็จ");
+    else fetchUsers();
   };
 
   const saveEdit = async () => {
     if (!editingUser) return;
-    try {
-      const { error } = await supabase.from("users").update({
-        username: editingUser.username,
-        phone: editingUser.phone,
-      }).eq("id", editingUser.id);
+    const { error } = await supabase.from("users").update({
+      username: editingUser.username,
+      phone: editingUser.phone,
+    }).eq("id", editingUser.id);
 
-      if (error) throw error;
-      alert("✅ บันทึกการแก้ไขสำเร็จ");
+    if (error) alert("❌ บันทึกการแก้ไขไม่สำเร็จ");
+    else {
       setEditingUser(null);
-      fetchUsers(true);
-    } catch (err) {
-      alert("❌ บันทึกไม่สำเร็จ: " + err.message);
+      fetchUsers();
     }
   };
 
-  if (authLoading) return <div style={{ color: "white", textAlign: "center", padding: "100px" }}>Checking Permissions...</div>;
-
   return (
-    <div className="page-container" style={{ maxWidth: '1100px', margin: '0 auto', padding: '40px 20px' }}>
-      <h1 style={{ marginBottom: "10px", fontWeight: "800", fontSize: '2.2rem' }}>👥 Manage Users</h1>
-      <p style={{ color: "var(--text-muted)", marginBottom: "30px" }}>ตรวจสอบและจัดการสิทธิ์สมาชิกทั้งหมดในระบบ WHY IT Shop</p>
+    <div className="page-container">
+      <h1 style={{ marginBottom: "30px", fontWeight: "800" }}>👥 Manage Users</h1>
 
-      <div className="glass-card" style={{ overflowX: "auto", padding: "0", borderRadius: '15px', border: '1px solid var(--card-border)' }}>
+      <div className="glass-card" style={{ overflowX: "auto", padding: "20px" }}>
         {loading ? (
-          <p style={{ color: "var(--text-muted)", textAlign: "center", padding: "50px" }}>กำลังดึงข้อมูลสมาชิก...</p>
+          <p style={{ color: "var(--text-muted)", textAlign: "center" }}>กำลังโหลดข้อมูล...</p>
+        ) : users.length === 0 ? (
+          <p style={{ color: "var(--danger)", textAlign: "center" }}>❌ ไม่มีผู้ใช้อยู่ในระบบ</p>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
             <thead>
-              <tr style={{ background: "rgba(255,255,255,0.05)", color: "var(--text-muted)", fontSize: '14px' }}>
-                <th style={{ padding: "20px" }}>Email</th>
-                <th style={{ padding: "20px" }}>Username</th>
-                <th style={{ padding: "20px" }}>Phone</th>
-                <th style={{ padding: "20px" }}>Role</th>
-                <th style={{ padding: "20px", textAlign: 'right' }}>Actions</th>
+              <tr style={{ borderBottom: "2px solid var(--card-border)", color: "var(--text-muted)" }}>
+                <th style={{ padding: "15px" }}>Email</th>
+                <th style={{ padding: "15px" }}>Username</th>
+                <th style={{ padding: "15px" }}>Phone</th>
+                <th style={{ padding: "15px" }}>Role</th>
+                <th style={{ padding: "15px" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {users.map((user) => (
                 <tr key={user.id} style={{ borderBottom: "1px solid var(--card-border)", transition: "0.2s" }}>
-                  <td style={{ padding: "15px 20px" }}>
-                    {user.email} {user.id === currentUser.id && <small style={{ color: 'var(--primary)' }}>(You)</small>}
-                  </td>
                   
-                  <td style={{ padding: "15px 20px" }}>
+                  <td style={{ padding: "15px" }}>{user.email}</td>
+                  
+                  <td style={{ padding: "15px" }}>
                     {editingUser?.id === user.id ? (
                       <input
                         className="input-glass"
-                        style={{ marginBottom: 0, padding: "8px", fontSize: '14px' }}
+                        style={{ marginBottom: 0, padding: "8px" }}
                         value={editingUser?.username || ""}
                         onChange={(e) => setEditingUser({ ...editingUser, username: e.target.value })}
                       />
                     ) : (user.username || "-")}
                   </td>
                   
-                  <td style={{ padding: "15px 20px" }}>
+                  <td style={{ padding: "15px" }}>
                     {editingUser?.id === user.id ? (
                       <input
                         className="input-glass"
-                        style={{ marginBottom: 0, padding: "8px", fontSize: '14px' }}
+                        style={{ marginBottom: 0, padding: "8px" }}
                         value={editingUser?.phone || ""}
                         onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
                       />
                     ) : (user.phone || "-")}
                   </td>
                   
-                  <td style={{ padding: "15px 20px" }}>
+                  <td style={{ padding: "15px" }}>
                     <span style={{ 
-                      background: user.role === "admin" ? "rgba(34, 197, 94, 0.1)" : "rgba(255,255,255,0.05)", 
+                      background: user.role === "admin" ? "rgba(34, 197, 94, 0.2)" : "var(--bg-secondary)", 
                       color: user.role === "admin" ? "var(--accent)" : "var(--text-muted)", 
-                      padding: "4px 12px", 
-                      borderRadius: "20px", 
-                      fontSize: "11px",
-                      fontWeight: "800",
-                      border: user.role === "admin" ? "1px solid var(--accent)" : "1px solid var(--card-border)",
-                      textTransform: 'uppercase'
+                      padding: "5px 10px", 
+                      borderRadius: "6px", 
+                      fontWeight: "bold",
+                      border: "1px solid var(--card-border)"
                     }}>
-                      {user.role}
+                      {user.role.toUpperCase()}
                     </span>
                   </td>
                   
-                  <td style={{ padding: "15px 20px", textAlign: 'right' }}>
+                  <td style={{ padding: "15px" }}>
                     {editingUser?.id === user.id ? (
-                      <div style={{ display: "flex", gap: "8px", justifyContent: 'flex-end' }}>
-                        <button className="btn-success" onClick={saveEdit} style={{ padding: "6px 15px", fontSize: "12px" }}>Save</button>
-                        <button className="btn-primary" onClick={() => setEditingUser(null)} style={{ background: "rgba(255,255,255,0.1)", padding: "6px 15px", fontSize: "12px" }}>Cancel</button>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button className="btn-success" onClick={saveEdit} style={{ padding: "6px 12px", fontSize: "13px" }}>Save</button>
+                        <button className="btn-primary" onClick={() => setEditingUser(null)} style={{ background: "var(--bg-secondary)", color: "var(--text-main)", padding: "6px 12px", fontSize: "13px", border: "1px solid var(--card-border)" }}>Cancel</button>
                       </div>
                     ) : (
-                      <div style={{ display: "flex", gap: "8px", justifyContent: 'flex-end' }}>
-                        <button className="btn-primary" onClick={() => setEditingUser(user)} style={{ padding: "6px 12px", fontSize: "12px", background: 'var(--bg-secondary)', border: '1px solid var(--card-border)' }}>Edit</button>
-                        <button className="btn-success" onClick={() => toggleRole(user.id, user.role)} style={{ padding: "6px 12px", fontSize: "12px" }}>Role</button>
-                        {user.id !== currentUser.id && (
-                          <button className="btn-primary" onClick={() => deleteUser(user.id)} style={{ background: "var(--danger)", padding: "6px 12px", fontSize: "12px" }}>Delete</button>
-                        )}
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button className="btn-primary" onClick={() => setEditingUser(user)} style={{ padding: "6px 12px", fontSize: "13px", background: "var(--primary)" }}>Edit</button>
+                        <button className="btn-success" onClick={() => toggleRole(user.id, user.role)} style={{ padding: "6px 12px", fontSize: "13px" }}>Role</button>
+                        <button className="btn-primary" onClick={() => deleteUser(user.id)} style={{ background: "var(--danger)", padding: "6px 12px", fontSize: "13px" }}>Delete</button>
                       </div>
                     )}
                   </td>
+                  
                 </tr>
               ))}
             </tbody>

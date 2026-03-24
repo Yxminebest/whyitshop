@@ -1,36 +1,35 @@
 /* ================= GLOBAL & THEME VARIABLES ================= */
 :root {
-  /* LIGHT MODE (Default) */
   --bg-main: #f0f4f8;
   --bg-secondary: #ffffff;
   --text-main: #0f172a;
   --text-muted: #64748b;
   --nav-bg: rgba(255, 255, 255, 0.85);
-  --card-bg: rgba(255, 255, 255, 0.7);
+  --card-bg: rgba(255, 255, 255, 0.9);
   --card-border: rgba(0, 0, 0, 0.05);
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
   --accent: #10b981;
   --danger: #ef4444;
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  --shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
 }
 
 [data-theme="dark"] {
-  /* DARK MODE */
   --bg-main: #020617;
   --bg-secondary: #0f172a;
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --nav-bg: rgba(2, 6, 23, 0.85);
-  --card-bg: rgba(30, 41, 59, 0.6);
+  --card-bg: rgba(30, 41, 59, 0.85);
   --card-border: rgba(255, 255, 255, 0.08);
   --primary: #38bdf8;
   --primary-hover: #0284c7;
   --accent: #22c55e;
   --danger: #ef4444;
-  --shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  --shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
 }
 
+/* ================= RESET ================= */
 * {
   margin: 0;
   padding: 0;
@@ -41,78 +40,61 @@
 body {
   background: var(--bg-main);
   color: var(--text-main);
-  transition: background 0.4s ease, color 0.4s ease; /* ทำให้สลับโหมดแล้วสมูท */
-  overflow-x: hidden;
+  transition: 0.3s;
 }
 
-/* ================= SHARED CLASSES (ใช้แทน Inline Style) ================= */
+/* ================= PAGE ================= */
 .page-container {
-  padding: 80px 40px;
+  padding: 40px 20px; /* 🔥 ลดจาก 80 */
   max-width: 1200px;
   margin: 0 auto;
-  min-height: 100vh;
 }
 
+/* ================= CARD (FIX สำคัญมาก) ================= */
 .glass-card {
   background: var(--card-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--card-border);
   box-shadow: var(--shadow);
-  border-radius: 20px;
-  padding: 30px;
-  transition: 0.3s ease;
+  border-radius: 16px;
+  padding: 15px; /* 🔥 ลดจาก 30 */
+  transition: 0.3s;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .glass-card:hover {
   transform: translateY(-5px);
 }
 
+/* ================= INPUT ================= */
 .input-glass {
   width: 100%;
-  padding: 12px 15px;
+  padding: 12px;
   border-radius: 10px;
   border: 1px solid var(--card-border);
   background: var(--bg-secondary);
   color: var(--text-main);
-  outline: none;
-  transition: 0.3s;
-  margin-bottom: 12px;
 }
 
-.input-glass:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
-}
-
+/* ================= BUTTON ================= */
 .btn-primary {
   background: linear-gradient(135deg, var(--primary), var(--primary-hover));
   color: #fff;
   border: none;
-  padding: 10px 20px;
-  border-radius: 10px;
-  font-weight: bold;
+  padding: 10px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: 0.3s;
-  text-decoration: none;
-  display: inline-block;
   text-align: center;
-}
-
-.btn-primary:hover {
-  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.3);
-  transform: scale(1.02);
 }
 
 .btn-success {
   background: linear-gradient(135deg, var(--accent), #16a34a);
   color: #fff;
   border: none;
-  padding: 10px 20px;
-  border-radius: 10px;
-  font-weight: bold;
+  padding: 10px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: 0.3s;
 }
 
 /* ================= NAV ================= */
@@ -121,75 +103,57 @@ body {
   top: 0;
   z-index: 1000;
   background: var(--nav-bg);
-  backdrop-filter: blur(15px);
+  backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--card-border);
-  padding: 15px 40px;
+  padding: 12px 20px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
 }
 
 .nav-links {
   display: flex;
-  gap: 20px;
-  align-items: center;
+  gap: 15px;
 }
 
 .nav-link {
   color: var(--text-main);
   text-decoration: none;
-  font-weight: 600;
-  transition: 0.2s;
 }
 
-.nav-link:hover {
-  color: var(--primary);
-}
-
-.theme-toggle {
-  background: var(--bg-secondary);
-  border: 1px solid var(--card-border);
-  color: var(--text-main);
-  font-size: 20px;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: 0.3s;
-}
-.theme-toggle:hover {
-  transform: rotate(20deg);
-}
-
-/* ================= HERO (Home) ================= */
-.hero {
-  text-align: center;
-  margin-bottom: 60px;
-  animation: fadeIn 1s ease;
-}
-
+/* ================= HERO ================= */
 .text-gradient {
-  font-size: 56px;
+  font-size: 48px;
   font-weight: 900;
   background: linear-gradient(90deg, var(--primary), var(--accent));
-  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-/* ================= GRID ================= */
+/* ================= GRID (FIX สำคัญ) ================= */
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 30px;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
 }
 
+/* ================= IMAGE ================= */
 .product-img {
   width: 100%;
-  height: 200px;
+  height: 180px;
   object-fit: cover;
-  border-radius: 12px;
-  margin-bottom: 15px;
+  border-radius: 10px;
+}
+
+/* ================= TEXT ================= */
+.price {
+  color: var(--primary);
+  font-weight: bold;
+}
+
+/* ================= STATE ================= */
+.loading,
+.empty {
+  text-align: center;
+  padding: 50px;
+  color: var(--text-muted);
 }
