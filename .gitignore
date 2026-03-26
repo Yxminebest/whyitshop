@@ -1,4 +1,16 @@
-# Logs
+# 📦 Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# 🏗️ Build Outputs
+dist/
+dist-ssr/
+*.local
+out/
+build/
+
+# 🧪 Logs
 logs
 *.log
 npm-debug.log*
@@ -7,20 +19,37 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# 🔐 Environment Variables (IMPORTANT)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+*.env.local
 
-# Editor directories and files
+# 🛠️ Editor & IDEs
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-# 🔐 ENV FILE 
-.env
+Visual Studio Code/
+
+# ⚡ Vite & Tooling
+.vite/
+.eslintcache
+.stylelintcache
+.prettiercache
+
+# 🗃️ OS Metadata
+Thumbs.db
+Desktop.ini
+
+# 🔥 Supabase (In case you use Supabase CLI)
+supabase/.temp/
+supabase/functions/.import_map.json
