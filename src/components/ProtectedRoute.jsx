@@ -17,7 +17,7 @@ function ProtectedRoute({ children }) {
           console.warn("Auth check timed out, forcing load finish.");
           setLoading(false);
         }
-      }, 2500);
+      }, 5000);
 
       try {
         const { data, error } = await supabase.auth.getSession();

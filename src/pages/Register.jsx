@@ -20,13 +20,12 @@ function Register() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // 🔐 sanitize
   const handleChange = (e) => {
     const { name, value } = e.target;
-
+    // ใช้ sanitizeInput เฉพาะส่วนที่เป็นข้อความธรรมดา
     setFormData({
       ...formData,
-      [name]: sanitizeInput(value)
+      [name]: name === "password" || name === "confirmPassword" ? value : sanitizeInput(value)
     });
   };
 
@@ -34,15 +33,9 @@ function Register() {
     e.preventDefault();
     setErrorMsg("");
 
-    if (
-      !formData.firstName ||
-      !formData.lastName ||
-      !formData.username ||
-      !formData.email ||
-      !formData.phone ||
-      !formData.address ||
-      !formData.password
-    ) {
+    // 1. Validation (โค้ดเดิมของคุณดีอยู่แล้ว)
+    if (!formData.firstName || !formData.lastName || !formData.username || 
+        !formData.email || !formData.phone || !formData.address || !formData.password) {
       return setErrorMsg("⚠️ กรุณากรอกข้อมูลให้ครบทุกช่อง");
     }
 
@@ -52,14 +45,15 @@ function Register() {
 
     const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
     if (!strongPasswordRegex.test(formData.password)) {
-      return setErrorMsg("⚠️ รหัสผ่านต้องมี A-Z, a-z และตัวเลข");
+      return setErrorMsg("⚠️ รหัสผ่านต้องมี 8 ตัวขึ้นไป และมี A-Z, a-z, 0-9");
     }
 
     try {
       setLoading(true);
 
+      // 2. สมัครสมาชิกใน Auth
       const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
+        email: formData.email.trim(),
         password: formData.password,
         options: {
           data: {
@@ -71,25 +65,32 @@ function Register() {
 
       if (error) throw error;
 
+      // 3. ถ้าสมัครผ่าน (และได้ User ID มา) ให้บันทึกลงตาราง users
       if (data?.user) {
         const { error: dbError } = await supabase.from("users").upsert([
           {
             id: data.user.id,
-            email: sanitizeInput(formData.email),
-            username: sanitizeInput(formData.username),
-            firstname: sanitizeInput(formData.firstName),
-            lastname: sanitizeInput(formData.lastName),
-            phone: sanitizeInput(formData.phone),
-            address: sanitizeInput(formData.address),
+            email: formData.email.trim(),
+            username: formData.username,
+            firstname: formData.firstName, // เช็คชื่อ column ให้ตรงกับใน DB นะครับ
+            lastname: formData.lastName,
+            phone: formData.phone,
+            address: formData.address,
             role: "user"
           }
         ]);
 
         if (dbError) throw dbError;
-      }
 
-      alert("🎉 สมัครสำเร็จ!");
-      navigate("/");
+        alert("🎉 สมัครสมาชิกสำเร็จ!");
+        
+        // ✅ บังคับเปลี่ยนหน้าและล้างสถานะเดิม (ป้องกันปัญหา Session ค้าง)
+        window.location.href = "/"; 
+      } else {
+        // กรณี Supabase ตั้งค่าให้ยืนยันอีเมล
+        alert("📧 กรุณาตรวจสอบอีเมลเพื่อยืนยันการสมัครสมาชิก");
+        navigate("/login");
+      }
 
     } catch (err) {
       setErrorMsg("❌ " + err.message);
@@ -99,60 +100,32 @@ function Register() {
   };
 
   return (
-    <div
-      className="page-container"
-      style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "80vh" }}
-    >
-      <div
-        className="glass-card"
-        style={{
-          width: "100%",
-          maxWidth: "500px",
-          textAlign: "center",
-          padding: "40px"
-        }}
-      >
+    <div className="page-container" style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "90vh" }}>
+      <div className="glass-card" style={{ width: "100%", maxWidth: "500px", textAlign: "center", padding: "40px" }}>
         <h1 style={{ marginBottom: "20px" }}>Create Account 🚀</h1>
 
-        {errorMsg && (
-          <div style={{ color: "#ff4d4f", marginBottom: "10px" }}>
-            {errorMsg}
-          </div>
-        )}
+        {errorMsg && <div style={{ color: "#ff4d4f", marginBottom: "15px", fontWeight: "bold" }}>{errorMsg}</div>}
 
         <form style={{ display: "flex", flexDirection: "column", gap: "12px" }} onSubmit={handleRegister}>
-          
-          <input className="input-glass" name="firstName" value={formData.firstName} onChange={handleChange} placeholder="First Name" />
-          <input className="input-glass" name="lastName" value={formData.lastName} onChange={handleChange} placeholder="Last Name" />
+          <div style={{ display: "flex", gap: "10px" }}>
+            <input className="input-glass" name="firstName" value={formData.firstName} onChange={handleChange} placeholder="First Name" style={{flex: 1}} />
+            <input className="input-glass" name="lastName" value={formData.lastName} onChange={handleChange} placeholder="Last Name" style={{flex: 1}} />
+          </div>
           <input className="input-glass" name="username" value={formData.username} onChange={handleChange} placeholder="Username" />
           <input className="input-glass" type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Email" />
           <input className="input-glass" name="phone" value={formData.phone} onChange={handleChange} placeholder="Phone" />
-
-          <textarea
-            className="input-glass"
-            name="address"
-            value={formData.address}
-            onChange={handleChange}
-            placeholder="Address"
-            style={{ resize: "none", height: "80px" }}
-          />
-
+          <textarea className="input-glass" name="address" value={formData.address} onChange={handleChange} placeholder="Address" style={{ resize: "none", height: "80px" }} />
           <input className="input-glass" type="password" name="password" value={formData.password} onChange={handleChange} placeholder="Password" />
           <input className="input-glass" type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} placeholder="Confirm Password" />
 
-          <button className="btn-primary" type="submit" disabled={loading}>
-            {loading ? "กำลังสมัคร..." : "REGISTER"}
+          <button className="btn-primary" type="submit" disabled={loading} style={{ padding: "15px", marginTop: "10px" }}>
+            {loading ? "กำลังสมัคร..." : "REGISTER NOW"}
           </button>
-
         </form>
 
         <p style={{ marginTop: "15px" }}>
-          มีบัญชีแล้ว?{" "}
-          <Link to="/login" style={{ color: "var(--primary)", fontWeight: "bold" }}>
-            Login
-          </Link>
+          มีบัญชีแล้ว? <Link to="/login" style={{ color: "var(--primary)", fontWeight: "bold" }}>Login</Link>
         </p>
-
       </div>
     </div>
   );
