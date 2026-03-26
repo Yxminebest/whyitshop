@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useContext, useEffect, useState } from "react";
 import { CartContext } from "../context/CartContext";
-import { supabase } from "../lib/supabase";
+import { supabase } from "../../Backend/config/supabase";
 
 function Navbar({ theme, toggleTheme }) {
   const { cartItems } = useContext(CartContext);

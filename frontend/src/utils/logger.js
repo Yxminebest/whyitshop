@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { supabase } from "../../Backend/config/supabase";
 
 export const logAction = async (action, detail = "") => {
   try {
