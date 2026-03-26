@@ -119,6 +119,8 @@ function AdminDashboard() {
     setPrice(item.price);
     setCategory(item.category);
     setDescription(item.description || "");
+    // เลื่อนหน้าจอขึ้นไปข้างบนเพื่อแก้ข้อมูล
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const resetForm = () => {
@@ -127,6 +129,7 @@ function AdminDashboard() {
     setCategory("");
     setImage(null);
     setDescription("");
+    setEditId(null);
   };
 
   const createCoupon = async () => {
@@ -147,101 +150,159 @@ function AdminDashboard() {
   };
 
   return (
-    <div className="page-container">
+    <div className="page-container" style={{ maxWidth: "1000px", margin: "0 auto", padding: "20px" }}>
 
-      {/* 🔥 HEADER + ปุ่ม Logs */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-        <h1>🛠 Admin Dashboard</h1>
-
-        {/* ✅ ปุ่ม Logs */}
+      {/* HEADER */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "30px" }}>
+        <h1 style={{ fontSize: "32px", fontWeight: "800" }}>🛠 Admin Dashboard</h1>
         <button
           onClick={() => navigate("/admin/logs")}
           className="btn-primary"
-          style={{ padding: "10px 18px", fontSize: "14px" }}
+          style={{ padding: "12px 24px", fontSize: "14px", borderRadius: "10px", display: "flex", alignItems: "center", gap: "8px" }}
         >
-          📊 ดู Logs
+          📊 ดู Logs ระบบ
         </button>
       </div>
 
-      {/* ADD PRODUCT */}
-      <div className="glass-card">
-        <h2>{editId ? "แก้ไขสินค้า" : "เพิ่มสินค้า"}</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "30px" }}>
+        
+        {/* ADD / EDIT PRODUCT */}
+        <div className="glass-card" style={{ padding: "30px", textAlign: "left" }}>
+          <h2 style={{ marginBottom: "20px", color: "var(--primary)", display: "flex", alignItems: "center", gap: "10px" }}>
+            {editId ? "📝 แก้ไขรายละเอียดสินค้า" : "📦 เพิ่มสินค้าใหม่เข้าสต็อก"}
+          </h2>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+            <input
+              className="input-glass"
+              value={name}
+              onChange={(e) => setName(sanitizeInput(e.target.value))}
+              placeholder="ชื่อสินค้า (เช่น LOGA YAKSA 75%)"
+            />
 
-        <input
-          value={name}
-          onChange={(e) => setName(sanitizeInput(e.target.value))}
-          placeholder="ชื่อสินค้า"
-        />
+            <div style={{ display: "flex", gap: "15px" }}>
+              <input
+                className="input-glass"
+                type="number"
+                style={{ flex: 1 }}
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="ราคาสินค้า (บาท)"
+              />
+              <select
+                className="input-glass"
+                style={{ flex: 1 }}
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
+                <option value="">เลือกหมวดหมู่</option>
+                <option>Mouse</option>
+                <option>Keyboard</option>
+                <option>Monitor</option>
+                <option>Headset</option>
+              </select>
+            </div>
 
-        <input
-          type="number"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          placeholder="ราคา"
-        />
+            <textarea
+              className="input-glass"
+              style={{ minHeight: "100px", resize: "vertical" }}
+              value={description}
+              onChange={(e) => setDescription(sanitizeInput(e.target.value))}
+              placeholder="ระบุรายละเอียดสินค้าโดยสังเขป..."
+            />
 
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-        >
-          <option value="">เลือกหมวดหมู่</option>
-          <option>Mouse</option>
-          <option>Keyboard</option>
-          <option>Monitor</option>
-          <option>Headset</option>
-        </select>
+            <div style={{ background: "rgba(255,255,255,0.05)", padding: "15px", borderRadius: "12px", border: "1px dashed var(--card-border)" }}>
+               <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "10px" }}>รูปภาพสินค้า (JPG/PNG):</p>
+               <input type="file" onChange={(e) => setImage(e.target.files[0])} style={{ fontSize: "14px" }} />
+            </div>
 
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(sanitizeInput(e.target.value))}
-          placeholder="รายละเอียดสินค้า"
-        />
-
-        <input type="file" onChange={(e) => setImage(e.target.files[0])} />
-
-        <button onClick={saveProduct}>
-          {loading ? "กำลังบันทึก..." : "บันทึก"}
-        </button>
-      </div>
-
-      {/* ADD COUPON */}
-      <div className="glass-card">
-        <h2>🎟 สร้างคูปอง</h2>
-
-        <input
-          value={couponCode}
-          onChange={(e) => setCouponCode(sanitizeInput(e.target.value))}
-          placeholder="COUPON CODE"
-        />
-
-        <select
-          value={couponType}
-          onChange={(e) => setCouponType(e.target.value)}
-        >
-          <option value="percent">%</option>
-          <option value="fixed">บาท</option>
-        </select>
-
-        <input
-          type="number"
-          value={couponValue}
-          onChange={(e) => setCouponValue(e.target.value)}
-        />
-
-        <button onClick={createCoupon}>
-          สร้างคูปอง
-        </button>
-      </div>
-
-      {/* PRODUCT LIST */}
-      {products.map((p) => (
-        <div key={p.id}>
-          <h4>{p.name}</h4>
-          <button onClick={() => handleEdit(p)}>แก้ไข</button>
-          <button onClick={() => deleteProduct(p.id)}>ลบ</button>
+            <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+              <button className="btn-success" onClick={saveProduct} disabled={loading} style={{ flex: 2, padding: "15px" }}>
+                {loading ? "กำลังดำเนินการ..." : editId ? "อัปเดตข้อมูลสินค้า" : "ยืนยันการเพิ่มสินค้า"}
+              </button>
+              {editId && (
+                <button className="btn-primary" onClick={resetForm} style={{ flex: 1, background: "var(--bg-secondary)" }}>ยกเลิก</button>
+              )}
+            </div>
+          </div>
         </div>
-      ))}
 
+        {/* ADD COUPON */}
+        <div className="glass-card" style={{ padding: "30px", textAlign: "left" }}>
+          <h2 style={{ marginBottom: "20px", color: "var(--accent)", display: "flex", alignItems: "center", gap: "10px" }}>
+            🎟 สร้างคูปองส่วนลดใหม่
+          </h2>
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "15px", alignItems: "flex-end" }}>
+            <div style={{ flex: 2, minWidth: "200px" }}>
+              <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "5px" }}>CODE:</p>
+              <input
+                className="input-glass"
+                value={couponCode}
+                onChange={(e) => setCouponCode(sanitizeInput(e.target.value))}
+                placeholder="เช่น WHYIT30"
+              />
+            </div>
+
+            <div style={{ flex: 1, minWidth: "100px" }}>
+              <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "5px" }}>ประเภท:</p>
+              <select
+                className="input-glass"
+                value={couponType}
+                onChange={(e) => setCouponType(e.target.value)}
+              >
+                <option value="percent">ลดเป็น %</option>
+                <option value="fixed">ลดเป็น บาท</option>
+              </select>
+            </div>
+
+            <div style={{ flex: 1, minWidth: "100px" }}>
+              <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "5px" }}>มูลค่า:</p>
+              <input
+                className="input-glass"
+                type="number"
+                value={couponValue}
+                onChange={(e) => setCouponValue(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+
+            <button className="btn-primary" onClick={createCoupon} style={{ padding: "15px 30px" }}>
+              สร้างคูปอง
+            </button>
+          </div>
+        </div>
+
+        {/* PRODUCT LIST (TABLE STYLE) */}
+        <div className="glass-card" style={{ padding: "30px" }}>
+          <h2 style={{ marginBottom: "20px", textAlign: "left" }}>📦 รายการสินค้าทั้งหมดในระบบ</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+            {products.length === 0 ? (
+              <p style={{ color: "var(--text-muted)", padding: "20px" }}>ไม่มีสินค้าในระบบ</p>
+            ) : (
+              products.map((p) => (
+                <div key={p.id} style={{ 
+                  display: "flex", justifyContent: "space-between", alignItems: "center", 
+                  padding: "15px 20px", background: "rgba(255,255,255,0.03)", 
+                  borderRadius: "15px", border: "1px solid var(--card-border)" 
+                }}>
+                  <div style={{ textAlign: "left" }}>
+                    <h4 style={{ margin: 0, fontSize: "16px" }}>{p.name}</h4>
+                    <p style={{ margin: 0, fontSize: "13px", color: "var(--primary)", fontWeight: "bold" }}>
+                      {p.price.toLocaleString()} บาท | <span style={{ color: "var(--text-muted)" }}>{p.category}</span>
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button onClick={() => handleEdit(p)} className="btn-primary" style={{ padding: "8px 15px", fontSize: "12px", background: "var(--bg-secondary)" }}>แก้ไข</button>
+                    <button onClick={() => deleteProduct(p.id)} className="btn-primary" style={{ padding: "8px 15px", fontSize: "12px", background: "var(--danger)" }}>ลบ</button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }
