@@ -1,23 +1,42 @@
 const API_URL = import.meta.env.VITE_API_URL;
 
 export const getProducts = async () => {
-  const res = await fetch(`${API_URL}/products`);
-  return res.json();
+  try {
+    const res = await fetch(`${API_URL}/products`);
+    if (!res.ok) throw new Error('Failed to fetch products');
+    return await res.json();
+  } catch (error) {
+    console.error("Error in getProducts:", error);
+    throw error;
+  }
 };
 
 export const addProduct = async (product) => {
-  const res = await fetch(`${API_URL}/products`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(product),
-  });
-  return res.json();
+  try {
+    const res = await fetch(`${API_URL}/products`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(product),
+    });
+    if (!res.ok) throw new Error('Failed to add product');
+    return await res.json();
+  } catch (error) {
+    console.error("Error in addProduct:", error);
+    throw error;
+  }
 };
 
 export const deleteProduct = async (id) => {
-  await fetch(`${API_URL}/products/${id}`, {
-    method: "DELETE",
-  });
+  try {
+    const res = await fetch(`${API_URL}/products/${id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error('Failed to delete product');
+    return await res.json(); 
+  } catch (error) {
+    console.error("Error in deleteProduct:", error);
+    throw error;
+  }
 };
