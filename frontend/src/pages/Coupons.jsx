@@ -1,18 +1,54 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
-import { useNavigate } from "react-router-dom"; // 🔥 เพิ่มตัวนำทาง
+import { useNavigate } from "react-router-dom";
 
 function Coupons() {
   const [coupons, setCoupons] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
+    // ดึงคูปองเลย (public data ไม่ต้องรอ auth)
     fetchCoupons();
   }, []);
 
   const fetchCoupons = async () => {
-    const { data } = await supabase.from("coupons").select("*").eq("is_active", true);
-    setCoupons(data || []);
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log("Fetching coupons using REST API...");
+      
+      // ใช้ REST API โดยตรง แทน supabase client
+      const response = await fetch(
+        'https://kslyrllmwbbgcepvotps.supabase.co/rest/v1/coupons?select=*',
+        {
+          method: 'GET',
+          headers: {
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtzbHlybGxtd2JiZ2NlcHZvdHBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyODk5MzMsImV4cCI6MjA4ODg2NTkzM30.ydYIpMDDc2VIALcOCmhBjoRPsy3sfx0eO_yKdKzzzrM',
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("Raw data from REST API:", data);
+      
+      // แสดงทั้งหมด (ไม่ filter - เพื่อดูว่ามี data หรือไม่)
+      console.log("All coupons:", data);
+      setCoupons(data || []);
+    } catch (err) {
+      console.error("Fetch coupons error:", err);
+      setError("ไม่สามารถโหลดคูปองได้: " + (err.message || JSON.stringify(err)));
+      setCoupons([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const claimCoupon = (code) => {
@@ -28,7 +64,18 @@ function Coupons() {
     <div className="page-container">
       <h1 style={{ marginBottom: "30px", fontWeight: "800", textAlign: "center" }}>🎟 คูปองส่วนลดพิเศษ</h1>
 
-      {coupons.length === 0 ? (
+      {loading ? (
+        <p style={{ color: "var(--text-muted)", textAlign: "center", marginTop: "50px" }}>
+          กำลังโหลดคูปอง...
+        </p>
+      ) : error ? (
+        <div style={{ textAlign: "center", marginTop: "50px" }}>
+          <p style={{ color: "var(--danger)", marginBottom: "20px" }}>❌ {error}</p>
+          <button onClick={fetchCoupons} className="btn-primary">
+            ลองใหม่
+          </button>
+        </div>
+      ) : coupons.length === 0 ? (
         <p style={{ color: "var(--text-muted)", textAlign: "center", marginTop: "50px" }}>
           ยังไม่มีคูปองที่เปิดใช้งานในขณะนี้
         </p>

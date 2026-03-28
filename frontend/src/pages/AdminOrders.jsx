@@ -1,20 +1,51 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 function AdminOrders() {
+  const navigate = useNavigate();
+  const { user: authUser, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
   const [selectedSlip, setSelectedSlip] = useState(null);
 
   useEffect(() => {
-    const fetchOrders = async () => {
+    if (!authLoading && authUser) {
+      checkAdmin();
+      fetchOrders();
+    }
+  }, [authUser, authLoading]);
+
+  const checkAdmin = async () => {
+    if (!authUser?.id) {
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const { data } = await supabase.from("users").select("role").eq("id", authUser.id).maybeSingle();
+      if (!data || data.role !== "admin") {
+        alert("❌ คุณไม่มีสิทธิ์เข้าถึงหน้านี้");
+        navigate("/");
+      }
+    } catch (err) {
+      console.error("Admin check error:", err);
+      navigate("/");
+    }
+  };
+
+  const fetchOrders = async () => {
+    try {
       const { data } = await supabase.from("orders").select(`*, order_items (*)`).order("created_at", { ascending: false });
       setOrders(data || []);
+    } catch (err) {
+      console.error("Fetch orders error:", err);
+    } finally {
       setLoading(false);
-    };
-    fetchOrders();
-  }, []);
+    }
+  };
 
   // 🔥 แก้ไขฟังก์ชันนี้: เช็กว่าถ้าเป็นลิงก์เต็มอยู่แล้ว ให้ใช้ได้เลย
   const getSlipUrl = (path) => {

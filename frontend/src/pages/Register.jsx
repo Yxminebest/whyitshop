@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "../../Backend/config/supabase";
+import { supabase } from "../lib/supabase";
 import { useNavigate, Link } from "react-router-dom";
 import { sanitizeInput } from "../utils/sanitize";
 
@@ -65,36 +65,39 @@ function Register() {
 
       if (error) throw error;
 
-      // 3. ถ้าสมัครผ่าน (และได้ User ID มา) ให้บันทึกลงตาราง users
       if (data?.user) {
-        const { error: dbError } = await supabase.from("users").upsert([
-          {
-            id: data.user.id,
-            email: formData.email.trim(),
-            username: formData.username,
-            firstname: formData.firstName, // เช็คชื่อ column ให้ตรงกับใน DB นะครับ
-            lastname: formData.lastName,
-            phone: formData.phone,
-            address: formData.address,
-            role: "user"
-          }
-        ]);
+        // ✅ บันทึกข้อมูล user ลงตาราง users (ครบตามโครงสร้าง)
+        const { error: insertError } = await supabase
+          .from("users")
+          .insert([
+            {
+              id: data.user.id,
+              email: formData.email.trim(),
+              username: formData.username,
+              firstname: formData.firstName,
+              lastname: formData.lastName,
+              phone: formData.phone,
+              address: formData.address,
+              role: "user",
+              newsletter: false,
+              avatar: null
+            }
+          ]);
 
-        if (dbError) throw dbError;
+        if (insertError) {
+          console.error("Insert user error:", insertError);
+          throw insertError;
+        }
 
         alert("🎉 สมัครสมาชิกสำเร็จ!");
-        
-        // ✅ บังคับเปลี่ยนหน้าและล้างสถานะเดิม (ป้องกันปัญหา Session ค้าง)
         window.location.href = "/"; 
       } else {
-        // กรณี Supabase ตั้งค่าให้ยืนยันอีเมล
         alert("📧 กรุณาตรวจสอบอีเมลเพื่อยืนยันการสมัครสมาชิก");
         navigate("/login");
       }
 
     } catch (err) {
       setErrorMsg("❌ " + err.message);
-    } finally {
       setLoading(false);
     }
   };

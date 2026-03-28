@@ -2,6 +2,7 @@ import { useEffect, useState, useContext } from "react";
 import { supabase } from "../lib/supabase";
 import { CartContext } from "../context/CartContext";
 import { Link } from "react-router-dom";
+import { getProducts } from "../api/productApi";
 
 function Products() {
   const [products, setProducts] = useState([]);
@@ -11,9 +12,16 @@ function Products() {
 
   useEffect(() => {
     const fetchProducts = async () => {
-      const { data } = await supabase.from("products").select("*");
-      setProducts(data || []);
-      setLoading(false);
+      try {
+        setLoading(true);
+        const data = await getProducts();
+        setProducts(data || []);
+      } catch (error) {
+        console.error("Failed to load products:", error);
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchProducts();
   }, []);

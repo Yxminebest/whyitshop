@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../../Backend/config/supabase";
+import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { sanitizeInput } from "../utils/sanitize";
 
 function Profile() {
   const navigate = useNavigate();
+  const { user: authUser, loading: authLoading } = useAuth();
 
-  const [user, setUser] = useState(null);
   const [username, setUsername] = useState("");
   const [firstname, setFirstname] = useState("");
   const [lastname, setLastname] = useState("");
@@ -15,43 +16,55 @@ function Profile() {
   const [avatar, setAvatar] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [fetching, setFetching] = useState(true); // เพิ่มสถานะตอนโหลดข้อมูลครั้งแรก
+  const [fetching, setFetching] = useState(true);
 
+  // ตรวจสอบ auth และเปลี่ยนทาง
   useEffect(() => {
-    fetchProfile();
-  }, []);
-
-  const fetchProfile = async () => {
-    try {
-      setFetching(true);
-      const { data: sessionData } = await supabase.auth.getSession();
-      const currentUser = sessionData?.session?.user;
-
-      if (!currentUser) return navigate("/login");
-
-      setUser(currentUser);
-
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", currentUser.id)
-        .maybeSingle(); // ใช้ maybeSingle เพื่อป้องกัน error ถ้ายังไม่มี row
-
-      if (data) {
-        setUsername(data.username || "");
-        setFirstname(data.firstname || "");
-        setLastname(data.lastname || "");
-        setPhone(data.phone || "");
-        setAddress(data.address || "");
-        setPreview(data.avatar || null);
-        setAvatar(data.avatar || null);
-      }
-    } catch (err) {
-      console.error("Fetch profile error:", err);
-    } finally {
-      setFetching(false);
+    if (!authLoading && !authUser) {
+      navigate("/login");
     }
-  };
+  }, [authUser, authLoading, navigate]);
+
+  // โหลด profile เมื่อ user เปลี่ยน
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProfile = async (userId) => {
+      try {
+        setFetching(true);
+
+        const { data, error } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", userId)
+          .maybeSingle();
+
+        if (data && isMounted) {
+          setUsername(data.username || "");
+          setFirstname(data.firstname || "");
+          setLastname(data.lastname || "");
+          setPhone(data.phone || "");
+          setAddress(data.address || "");
+          setPreview(data.avatar || null);
+          setAvatar(data.avatar || null);
+        }
+      } catch (err) {
+        console.error("Load profile error:", err);
+      } finally {
+        if (isMounted) {
+          setFetching(false);
+        }
+      }
+    };
+
+    if (authUser?.id) {
+      loadProfile(authUser.id);
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [authUser?.id]);
 
   const handleUpload = async (e) => {
     const file = e.target.files[0];
@@ -61,7 +74,7 @@ function Profile() {
 
     try {
       setLoading(true);
-      const fileName = `${user.id}_avatar`;
+      const fileName = `${authUser.id}_avatar`;
 
       const { error } = await supabase.storage
         .from("avatars")
@@ -85,7 +98,7 @@ function Profile() {
   };
 
   const saveProfile = async () => {
-    if (!user) return;
+    if (!authUser?.id) return;
     try {
       setLoading(true);
       const { error } = await supabase
@@ -96,9 +109,9 @@ function Profile() {
           lastname: sanitizeInput(lastname),
           phone: sanitizeInput(phone),
           address: sanitizeInput(address),
-          avatar: avatar || preview,
+          avatar: avatar
         })
-        .eq("id", user.id);
+        .eq("id", authUser.id);
 
       if (error) throw error;
       alert("✅ บันทึกข้อมูลสำเร็จ");
@@ -152,7 +165,7 @@ function Profile() {
         </div>
 
         <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "20px" }}>
-          ID: {user?.id}
+          ID: {authUser?.id}
         </p>
 
         {/* Form Inputs */}

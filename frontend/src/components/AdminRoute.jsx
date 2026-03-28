@@ -1,47 +1,69 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { supabase } from "../../Backend/config/supabase";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../context/AuthContext";
 
 function AdminRoute({ children }) {
-  const [loading, setLoading] = useState(true);
+  const { user, loading } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     const checkAdmin = async () => {
+      if (!user) {
+        setIsAdmin(false);
+        setChecking(false);
+        return;
+      }
+
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const user = sessionData?.session?.user;
+        const { data, error } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", user.id)
+          .single();
 
-        if (!user) {
-          setIsAdmin(false);
-          setLoading(false);
-          return;
+        if (error) throw error;
+
+        if (isMounted) {
+          setIsAdmin(data?.role === "admin");
         }
-
-        const { data } = await supabase.from("users").select("role").eq("id", user.id).single();
-        setIsAdmin(data?.role === "admin");
       } catch (error) {
         console.error("Admin check error:", error);
-        setIsAdmin(false);
+        if (isMounted) {
+          setIsAdmin(false);
+        }
       } finally {
-        // 🔥 ปิดโหลดเสมอไม่ว่าจะเช็กผ่านหรือไม่ผ่าน
-        setLoading(false); 
+        if (isMounted) {
+          setChecking(false);
+        }
       }
     };
 
     checkAdmin();
-  }, []);
 
-  if (loading) {
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  if (loading || checking) {
     return (
       <div className="page-container" style={{ textAlign: "center", marginTop: "100px" }}>
-        <h2 style={{ color: "var(--primary)" }}>กำลังตรวจสอบสิทธิ์ผู้ดูแลระบบ... 🛡️</h2>
+        <div className="glass-card" style={{ padding: "40px", display: "inline-block" }}>
+          <h2 style={{ color: "var(--primary)" }}>กำลังตรวจสอบสิทธิ์ผู้ดูแลระบบ... 🛡️</h2>
+          <p style={{ color: "var(--text-muted)", fontSize: "14px", marginTop: "10px" }}>กรุณารอสักครู่...</p>
+        </div>
       </div>
     );
   }
 
-  // ถ้าไม่ใช่แอดมิน ให้เด้งกลับไปหน้าแรก
-  if (!isAdmin) return <Navigate to="/" />;
+  if (!isAdmin) {
+    console.warn("User is not admin, redirecting to home");
+    return <Navigate to="/" replace />;
+  }
 
   return children;
 }

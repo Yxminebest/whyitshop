@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../../Backend/config/supabase";
+import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { sanitizeInput } from "../utils/sanitize"; 
 
 function AdminDashboard() {
   const navigate = useNavigate();
+  const { user: authUser, loading: authLoading } = useAuth();
 
   const [products, setProducts] = useState([]);
   const [name, setName] = useState("");
@@ -20,25 +22,31 @@ function AdminDashboard() {
   const [couponValue, setCouponValue] = useState("");
 
   useEffect(() => {
-    checkAdmin();
-    fetchProducts();
-  }, []);
+    if (!authLoading && authUser) {
+      checkAdmin();
+      fetchProducts();
+    }
+  }, [authUser, authLoading]);
 
   const checkAdmin = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return navigate("/login");
+    if (!authUser?.id) {
+      navigate("/login");
+      return;
+    }
 
-    const { data } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (data?.role !== "admin") {
-      alert("ไม่มีสิทธิ์ ❌");
+    try {
+      const { data } = await supabase.from("users").select("role").eq("id", authUser.id).maybeSingle();
+      if (!data || data.role !== "admin") {
+        alert("❌ คุณไม่มีสิทธิ์เข้าถึงหน้านี้");
+        navigate("/");
+      }
+    } catch (err) {
+      console.error("Admin check error:", err);
       navigate("/");
     }
   };
+
+  // เรียกข้อมูลสินค้า
 
   const fetchProducts = async () => {
     const { data } = await supabase
@@ -293,8 +301,38 @@ function AdminDashboard() {
                     </p>
                   </div>
                   <div style={{ display: "flex", gap: "10px" }}>
-                    <button onClick={() => handleEdit(p)} className="btn-primary" style={{ padding: "8px 15px", fontSize: "12px", background: "var(--bg-secondary)" }}>แก้ไข</button>
-                    <button onClick={() => deleteProduct(p.id)} className="btn-primary" style={{ padding: "8px 15px", fontSize: "12px", background: "var(--danger)" }}>ลบ</button>
+                    <button 
+                      onClick={() => handleEdit(p)} 
+                      className="btn-primary" 
+                      style={{ 
+                        padding: "8px 15px", 
+                        fontSize: "12px", 
+                        background: "var(--primary)",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontWeight: "bold"
+                      }}
+                    >
+                      ✏️ แก้ไข
+                    </button>
+                    <button 
+                      onClick={() => deleteProduct(p.id)} 
+                      className="btn-primary" 
+                      style={{ 
+                        padding: "8px 15px", 
+                        fontSize: "12px", 
+                        background: "#ff4757",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontWeight: "bold"
+                      }}
+                    >
+                      🗑️ ลบ
+                    </button>
                   </div>
                 </div>
               ))

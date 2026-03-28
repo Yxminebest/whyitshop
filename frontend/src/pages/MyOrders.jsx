@@ -1,39 +1,56 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { useAuth } from "../context/AuthContext";
 
 function MyOrders() {
+  const { user, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSlip, setSelectedSlip] = useState(null);
 
+  // ดึงออเดอร์เมื่อ user เปลี่ยนหรือหน้าโหลด
   useEffect(() => {
+    let isMounted = true;
+
     const fetchMyOrders = async () => {
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const currentUser = sessionData?.session?.user;
+        setLoading(true);
+        
+        // ถ้า auth context พร้อม และมี user
+        if (!authLoading && user?.id) {
+          const { data, error } = await supabase
+            .from("orders")
+            .select(`*, order_items (*)`)
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false });
 
-        if (!currentUser) {
-          setLoading(false);
-          return;
+          if (error) throw error;
+          if (isMounted) {
+            setOrders(data || []);
+          }
+        } else {
+          if (isMounted) {
+            setOrders([]);
+          }
         }
-
-        const { data, error } = await supabase
-          .from("orders")
-          .select(`*, order_items (*)`)
-          .eq("user_id", currentUser.id)
-          .order("created_at", { ascending: false });
-
-        if (error) throw error;
-        setOrders(data || []);
       } catch (err) {
         console.error("Fetch orders error:", err);
+        if (isMounted) {
+          setOrders([]);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchMyOrders();
-  }, []);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, authLoading]);
 
   // 🔥 ฟังก์ชันแก้บั๊กรูปแตก: ดึง Public URL ของสลิป
   const getSlipUrl = (path) => {

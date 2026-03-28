@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
-import { supabase } from "../../Backend/config/supabase";
+import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 function ResetPassword() {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
 
   /* ================= STATE ================= */
   const [password, setPassword] = useState("");
@@ -18,22 +20,16 @@ function ResetPassword() {
     // 🔥 ตรวจสอบว่าลิงก์ Error หรือหมดอายุหรือไม่
     if (hash.includes("error")) {
       setMessage({ text: "⚠️ ลิงก์หมดอายุหรือไม่ถูกต้อง กรุณาขอลิงก์ใหม่", type: "error" });
-      setTimeout(() => navigate("/forgot-password"), 3000); // พากลับไปขอใหม่ใน 3 วินาที
+      setTimeout(() => navigate("/forgot-password"), 3000);
       return;
     }
 
-    // 🔥 ตรวจสอบ Session ว่าผู้ใช้คลิกมาจากอีเมลจริงไหม
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-
-      if (!data.session) {
-        setMessage({ text: "⚠️ ไม่พบสิทธิ์ในการเปลี่ยนรหัสผ่าน กรุณาขอลิงก์ใหม่", type: "error" });
-        setTimeout(() => navigate("/forgot-password"), 3000);
-      }
-    };
-
-    checkSession();
-  }, [navigate]);
+    // 🔥 ถ้า auth context ไม่พร้อมหรือไม่มี user ก็ไป forgot-password
+    if (!user && !authLoading) {
+      setMessage({ text: "⚠️ ไม่พบสิทธิ์ในการเปลี่ยนรหัสผ่าน กรุณาขอลิงก์ใหม่", type: "error" });
+      setTimeout(() => navigate("/forgot-password"), 3000);
+    }
+  }, [user, authLoading, navigate]);
 
   /* ================= UPDATE PASSWORD ================= */
   const updatePassword = async () => {

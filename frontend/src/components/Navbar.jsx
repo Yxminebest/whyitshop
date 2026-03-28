@@ -1,143 +1,262 @@
-import { Link, useNavigate } from "react-router-dom";
-import { useContext, useEffect, useState } from "react";
-import { CartContext } from "../context/CartContext";
-import { supabase } from "../../Backend/config/supabase";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
+import { logAction } from "../utils/logger";
 
 function Navbar({ theme, toggleTheme }) {
-  const { cartItems } = useContext(CartContext);
   const navigate = useNavigate();
-
+  const location = useLocation();
+  const { user: authUser, loading: authLoading } = useAuth();
   const [user, setUser] = useState(null);
-  const [role, setRole] = useState(null);
-
-  const totalQty = cartItems.reduce((sum, item) => sum + (item.qty || 1), 0);
-
-  // ฟังก์ชันดึง Role จากฐานข้อมูล
-  const fetchRole = async (userId) => {
-    try {
-      const { data } = await supabase.from("users").select("role").eq("id", userId).maybeSingle();
-      setRole(data?.role || "user");
-    } catch (err) {
-      setRole("user");
-    }
-  };
+  const [userRole, setUserRole] = useState("user");
+  const [cartCount, setCartCount] = useState(0);
+  const [adminDropdown, setAdminDropdown] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
-    
-    const loadSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!isMounted) return;
-      
-      const currentUser = data?.session?.user || null;
-      setUser(currentUser);
-      if (currentUser) fetchRole(currentUser.id);
+    if (authUser?.id) {
+      setUser(authUser);
+      const fetchUserRole = async () => {
+        try {
+          const { data } = await supabase
+            .from("users")
+            .select("role")
+            .eq("id", authUser.id)
+            .maybeSingle();
+          setUserRole(data?.role || "user");
+        } catch (err) {
+          console.error("Error fetching user role:", err);
+          setUserRole("user");
+        }
+      };
+      fetchUserRole();
+    } else {
+      setUser(null);
+      setUserRole("user");
+    }
+  }, [authUser]);
+
+  useEffect(() => {
+    // ✅ อ่านจำนวนสินค้าจาก localStorage ทันทีเมื่อ component mount
+    const updateCartCount = () => {
+      const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+      setCartCount(cart.length);
     };
 
-    loadSession();
+    // เรียกครั้งแรก
+    updateCartCount();
+    
+    // ฟังการเปลี่ยนแปลง localStorage
+    const handleCartUpdate = () => {
+      updateCartCount();
+    };
 
-    // 🔥 ปรับปรุง Listener ให้ดักจับการ Logout ได้แม่นยำขึ้น
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!isMounted) return;
-      
-      if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
-        setUser(null);
-        setRole(null);
-        localStorage.clear();
-        sessionStorage.clear();
-      } else if (session?.user) {
-        setUser(session.user);
-        fetchRole(session.user.id);
-      }
-    });
-
+    window.addEventListener("cartUpdated", handleCartUpdate);
+    
+    // ✅ เพิ่ม: ฟังการเปลี่ยนแปลง storage จาก tabs อื่น
+    window.addEventListener("storage", handleCartUpdate);
+    
     return () => {
-      isMounted = false;
-      listener.subscription.unsubscribe();
+      window.removeEventListener("cartUpdated", handleCartUpdate);
+      window.removeEventListener("storage", handleCartUpdate);
     };
   }, []);
 
-  // 🔥 ฟังก์ชัน Logout แบบล้างกระดาน (Hard Reset)
   const logoutUser = async () => {
     try {
-      // 1. ล้างค่าใน state ก่อนเพื่อความไว
-      setUser(null);
-      setRole(null);
-      
-      // 2. สั่ง signOut จากระบบหลังบ้าน
-      await supabase.auth.signOut();
-      
-      // 3. ล้างขยะใน Browser ทั้งหมด
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      logAction("LOGOUT", `User ${user?.email} logged out`);
       localStorage.clear();
       sessionStorage.clear();
-      
+      navigate("/login");
+      window.location.reload();
     } catch (err) {
       console.error("Logout error:", err);
-    } finally {
-      // 4. 🚀 บังคับรีโหลดหน้าเว็บไปที่ Login (แก้ปัญหาค้าง Loading ได้ขาดกระจุย)
-      window.location.href = "/login"; 
+      alert("❌ Logout failed: " + err.message);
     }
   };
 
+  if (authLoading) {
+    return (
+      <nav className="navbar" style={{ background: "var(--card-bg)", padding: "20px" }}>
+        <div className="nav-container" style={{ textAlign: "center", color: "var(--text-muted)" }}>
+          ⏳ Loading...
+        </div>
+      </nav>
+    );
+  }
+
   return (
-    <nav className="navbar">
-      {/* --- ฝั่งซ้าย --- */}
-      <div className="nav-left">
-        <Link to="/" className="nav-link">Home</Link>
-        <Link to="/products" className="nav-link">Products</Link>
-        <Link to="/coupons" className="nav-link">Coupons</Link>
-      </div>
-
-      {/* --- ตรงกลาง (Logo) --- */}
-      <div className="nav-center">
-        <Link to="/" style={{ textDecoration: "none" }}>
-          <h2 className="brand-logo">
-            <span style={{ color: "var(--primary)" }}>WHY IT</span>
-            <span style={{ color: "var(--text-main)", marginLeft: "6px" }}>Shop</span>
-          </h2>
-        </Link>
-      </div>
-
-      {/* --- ฝั่งขวา --- */}
-      <div className="nav-right">
-        {/* เมนูแอดมิน */}
-        {role === "admin" && (
-          <div className="admin-menu-group">
-            <Link to="/admin" className="nav-link admin-link">Dashboard</Link>
-            <Link to="/admin/users" className="nav-link admin-link">Users</Link>
-            <Link to="/admin/orders" className="nav-link admin-link">Orders</Link>
-          </div>
-        )}
-
-        {/* ประวัติการสั่งซื้อ (เฉพาะ User ทั่วไป) */}
-        {user && role !== "admin" && (
-           <Link to="/my-orders" className="nav-link">My Orders</Link>
-        )}
-
-        {/* ตะกร้า */}
-        <Link to="/cart" className="nav-link cart-badge">
-          🛒 Cart <span className="cart-count">{totalQty}</span>
-        </Link>
-
-        {/* ปุ่มสลับโหมดมืด/สว่าง */}
-        <button className="theme-toggle" onClick={toggleTheme} title="Switch Theme">
-          {theme === "light" ? "🌙" : "☀️"}
+    <nav className="navbar" style={{ 
+      position: "relative", 
+      width: "100%", 
+      zIndex: 1000, 
+      background: "var(--card-bg)",
+      boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+      borderBottom: "1px solid var(--card-border)"
+    }}>
+      
+      {/* 🟢 TOP RIGHT: Theme, Profile & Logout Only */}
+      <div style={{
+        position: "absolute",
+        top: "15px",
+        right: "20px",
+        display: "flex",
+        gap: "12px",
+        alignItems: "center"
+      }}>
+        {/* Theme Toggle */}
+        <button 
+          onClick={toggleTheme} 
+          style={{
+            background: "transparent",
+            border: "1px solid var(--card-border)",
+            color: "var(--text-main)",
+            width: "36px",
+            height: "36px",
+            borderRadius: "50%",
+            cursor: "pointer",
+            fontSize: "16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "0.3s"
+          }}
+        >
+          {theme === "dark" ? "☀️" : "🌙"}
         </button>
 
-        {/* โปรไฟล์ และ ปุ่ม Login/Logout */}
         {user ? (
-          <div className="user-profile-group">
-            <Link to="/profile" className="user-profile-link" title="จัดการโปรไฟล์">
-              <span style={{ fontSize: "16px" }}>👋</span>
-              <span className="user-name-text">
-                {user.user_metadata?.username || user.user_metadata?.full_name || user.email.split("@")[0]}
-              </span>
-            </Link>
-            <button onClick={logoutUser} className="btn-logout">Logout</button>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: "5px" }}>
+                <button onClick={() => navigate("/my-orders")} title="My Orders" style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: "18px" }}>📦</button>
+                <button onClick={() => navigate("/profile")} title="Settings" style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: "18px" }}>⚙️</button>
+            </div>
+            
+            <span style={{ fontSize: "14px", fontWeight: "600", color: "var(--text-main)" }}>
+              👤 {user.email.split('@')[0]}
+            </span>
+
+            <button onClick={logoutUser} style={{ 
+              background: "rgba(255, 71, 87, 0.1)", 
+              color: "#ff4757", 
+              padding: "6px 12px", 
+              border: "1px solid #ff4757", 
+              borderRadius: "20px", 
+              cursor: "pointer", 
+              fontWeight: "bold", 
+              fontSize: "12px",
+              transition: "0.3s"
+            }}>Logout</button>
           </div>
         ) : (
-          <Link to="/login" className="btn-primary" style={{ padding: "8px 20px" }}>Login</Link>
+          <button onClick={() => navigate("/login")} style={{ 
+            background: "var(--primary)", 
+            color: "white", 
+            padding: "8px 20px", 
+            border: "none", 
+            borderRadius: "20px", 
+            cursor: "pointer", 
+            fontWeight: "bold" 
+          }}>Login</button>
         )}
+      </div>
+
+      {/* 🔵 MAIN MENU SECTION: Centered Menu Items + Cart */}
+      <div className="nav-container" style={{ 
+        display: "flex", 
+        justifyContent: "center",
+        padding: "15px 0"
+      }}>
+        <div className="nav-menu" style={{ 
+          display: "flex", 
+          gap: "8px", 
+          alignItems: "center",
+          background: "var(--bg-secondary)",
+          padding: "6px",
+          borderRadius: "30px",
+          border: "1px solid var(--card-border)"
+        }}>
+            <button
+              className={`nav-link ${location.pathname === "/" ? "active" : ""}`}
+              onClick={() => navigate("/")}
+              style={{ 
+                background: location.pathname === "/" ? "var(--primary)" : "transparent",
+                color: location.pathname === "/" ? "white" : "var(--text-main)",
+                padding: "8px 18px", border: "none", borderRadius: "25px", cursor: "pointer", fontWeight: "bold", transition: "0.3s"
+              }}
+            >
+              🏠 Home
+            </button>
+            <button
+              className={`nav-link ${location.pathname === "/products" ? "active" : ""}`}
+              onClick={() => navigate("/products")}
+              style={{ 
+                background: location.pathname === "/products" ? "var(--primary)" : "transparent",
+                color: location.pathname === "/products" ? "white" : "var(--text-main)",
+                padding: "8px 18px", border: "none", borderRadius: "25px", cursor: "pointer", fontWeight: "bold", transition: "0.3s"
+              }}
+            >
+              🛍️ Products
+            </button>
+            <button
+              className={`nav-link ${location.pathname === "/coupons" ? "active" : ""}`}
+              onClick={() => navigate("/coupons")}
+              style={{ 
+                background: location.pathname === "/coupons" ? "var(--primary)" : "transparent",
+                color: location.pathname === "/coupons" ? "white" : "var(--text-main)",
+                padding: "8px 18px", border: "none", borderRadius: "25px", cursor: "pointer", fontWeight: "bold", transition: "0.3s"
+              }}
+            >
+              🎟️ Coupons
+            </button>
+
+            {/* 🛒 CART BUTTON (Moved here) */}
+            <button
+              onClick={() => navigate("/cart")}
+              style={{ 
+                background: location.pathname === "/cart" ? "var(--primary)" : "rgba(0, 212, 255, 0.1)",
+                color: location.pathname === "/cart" ? "white" : "#00d4ff",
+                padding: "8px 18px", 
+                border: "1px solid #00d4ff", 
+                borderRadius: "25px", 
+                cursor: "pointer", 
+                fontWeight: "900",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                transition: "0.3s"
+              }}
+            >
+              🛒 <span style={{ fontSize: "14px" }}>Cart ({cartCount})</span>
+            </button>
+
+            {/* Admin Menu Section */}
+            {user && userRole === "admin" && (
+              <div style={{ position: "relative" }}>
+                <button
+                  onClick={() => setAdminDropdown(!adminDropdown)}
+                  style={{ 
+                    background: adminDropdown ? "#333" : "transparent",
+                    color: adminDropdown ? "white" : "var(--text-main)",
+                    padding: "8px 18px", border: "none", borderRadius: "25px", cursor: "pointer", fontWeight: "bold", display: "flex", alignItems: "center", gap: "5px"
+                  }}
+                >
+                  ⚙️ Admin {adminDropdown ? "▲" : "▼"}
+                </button>
+                {adminDropdown && (
+                  <div style={{
+                    position: "absolute", top: "110%", left: "50%", transform: "translateX(-50%)", background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: "12px", boxShadow: "0 8px 20px rgba(0,0,0,0.2)", minWidth: "180px", zIndex: 100, overflow: "hidden"
+                  }}>
+                    <button onClick={() => { navigate("/admin/dashboard"); setAdminDropdown(false); }} style={{ width: "100%", padding: "12px", textAlign: "left", background: "transparent", border: "none", color: "var(--text-main)", cursor: "pointer", borderBottom: "1px solid var(--card-border)" }}>📊 Dashboard</button>
+                    <button onClick={() => { navigate("/admin/users"); setAdminDropdown(false); }} style={{ width: "100%", padding: "12px", textAlign: "left", background: "transparent", border: "none", color: "var(--text-main)", cursor: "pointer", borderBottom: "1px solid var(--card-border)" }}>👥 Users</button>
+                    <button onClick={() => { navigate("/admin/orders"); setAdminDropdown(false); }} style={{ width: "100%", padding: "12px", textAlign: "left", background: "transparent", border: "none", color: "var(--text-main)", cursor: "pointer" }}>📦 Orders</button>
+                  </div>
+                )}
+              </div>
+            )}
+        </div>
       </div>
     </nav>
   );

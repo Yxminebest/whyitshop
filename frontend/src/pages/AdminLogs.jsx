@@ -1,21 +1,27 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 function AdminLogs() {
   const navigate = useNavigate();
+  const { user: authUser, loading: authLoading } = useAuth();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkAdmin();
-    fetchLogs();
-  }, []);
+    if (!authLoading && authUser) {
+      checkAdmin();
+      fetchLogs();
+    }
+  }, [authUser, authLoading]);
 
   // 🔐 ตรวจว่าเป็น admin
   const checkAdmin = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return navigate("/login");
+    if (!authUser?.id) {
+      navigate("/login");
+      return;
+    }
 
     const { data } = await supabase
       .from("users")

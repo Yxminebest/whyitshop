@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "../../Backend/config/supabase";
+import { supabase } from "../lib/supabase";
 import { useNavigate, Link } from "react-router-dom";
 import { logAction } from "../utils/logger";
 
@@ -10,15 +10,12 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  // 1. ✅ ปรับปรุง: ใช้ upsert เพื่อป้องกัน Error 409 Conflict
   const syncUserToPublicTable = async (user) => {
     try {
-      // ใช้ upsert แทน insert เพื่อให้ระบบไม่พังถ้ามี ID นี้อยู่แล้ว
       const { error } = await supabase.from("users").upsert(
         { 
           id: user.id, 
           email: user.email, 
-          // ไม่ระบุ role ตรงนี้เพื่อป้องกันการทับค่า 'admin' กลายเป็น 'user' โดยไม่ตั้งใจ
         }, 
         { onConflict: 'id' }
       );
@@ -29,7 +26,6 @@ function Login() {
     }
   };
 
-  // 2. ฟังก์ชันดึง Role
   const getUserRole = async (userId) => {
     try {
       const { data } = await supabase
@@ -43,7 +39,6 @@ function Login() {
     }
   };
 
-  // 3. 🔥 ฟังก์ชัน Login หลัก
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
     if (!email || !password) return alert("กรุณากรอกข้อมูลให้ครบช่องครับ");
@@ -51,39 +46,31 @@ function Login() {
     try {
       setLoading(true);
 
+      // ✅ REAL Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
-        password: password
+        password: password.trim(),
       });
 
-      if (error) {
-        setLoading(false); 
-        return alert("❌ " + error.message);
-      }
+      if (error) throw new Error(error.message);
+      if (!data.user) throw new Error("Login failed");
 
-      if (data?.user) {
-        const user = data.user;
+      // Sync user to public table
+      await syncUserToPublicTable(data.user);
 
-        // บันทึก Log และ Sync ข้อมูล (แบบไม่ขวางการทำงานหลัก)
-        await Promise.all([
-          syncUserToPublicTable(user),
-          logAction("LOGIN", `User login: ${user.email}`).catch(() => {})
-        ]);
+      // Get user role
+      const role = await getUserRole(data.user.id);
 
-        const role = await getUserRole(user.id);
+      // Log action
+      logAction("LOGIN", `User ${data.user.email} logged in with role: ${role}`);
 
-        // ✅ บังคับเปลี่ยนหน้าและล้าง Cache
-        if (role === "admin") {
-          window.location.href = "/admin";
-        } else {
-          window.location.href = "/";
-        }
-      }
+      // Redirect
+      navigate(role === "admin" ? "/admin/dashboard" : "/");
 
     } catch (err) {
-      console.error("System Error:", err);
-      alert("เกิดข้อผิดพลาดของระบบ กรุณาลองใหม่อีกครั้ง");
-      setLoading(false); 
+      console.error("Login error:", err);
+      setLoading(false);
+      alert("❌ " + (err.message || "Login failed"));
     }
   };
 

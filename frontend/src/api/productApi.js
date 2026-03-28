@@ -1,13 +1,28 @@
+import { supabase } from "../lib/supabase";
+
 const API_URL = import.meta.env.VITE_API_URL;
 
 export const getProducts = async () => {
   try {
-    const res = await fetch(`${API_URL}/products`);
-    if (!res.ok) throw new Error('Failed to fetch products');
-    return await res.json();
+    // ลองเรียก Backend API ก่อน
+    try {
+      const res = await fetch(`${API_URL}/products`, { 
+        signal: AbortSignal.timeout(5000) // timeout 5 วินาที
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      console.warn("Backend API failed, falling back to Supabase:", err);
+    }
+
+    // ถ้า Backend API ล้มเหลว ให้ใช้ Supabase แทน
+    const { data, error } = await supabase.from("products").select("*");
+    if (error) throw error;
+    return data || [];
   } catch (error) {
     console.error("Error in getProducts:", error);
-    throw error;
+    return [];
   }
 };
 
