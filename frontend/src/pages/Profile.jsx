@@ -74,23 +74,42 @@ function Profile() {
 
     try {
       setLoading(true);
-      const fileName = `${authUser.id}_avatar`;
+      // Create safe filename without .jpg (Supabase will handle this)
+      const fileName = `avatar_${authUser.id.replace(/-/g, '')}_${Date.now()}`;
 
-      const { error } = await supabase.storage
+      // Upload with correct content type
+      const { data, error } = await supabase.storage
         .from("avatars")
-        .upload(fileName, file, { upsert: true });
+        .upload(fileName, file, { 
+          cacheControl: '3600',
+          upsert: true,
+          contentType: file.type
+        });
 
-      if (error) throw error;
+      if (error) throw new Error(error.message);
 
-      const { data } = supabase.storage
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
         .from("avatars")
         .getPublicUrl(fileName);
 
-      const url = data.publicUrl + "?t=" + Date.now();
+      if (!publicUrlData?.publicUrl) throw new Error("Failed to get public URL");
+      
+      const url = publicUrlData.publicUrl;
+      
+      // Save avatar URL to users table
+      const { error: updateError } = await supabase
+        .from("users")
+        .update({ avatar: url })
+        .eq("id", authUser.id);
+      
+      if (updateError) throw updateError;
+      
       setAvatar(url);
       setPreview(url);
       alert("อัปโหลดรูปภาพสำเร็จ ✨");
     } catch (err) {
+      console.error("Upload error details:", err);
       alert("อัปโหลดไม่สำเร็จ: " + err.message);
     } finally {
       setLoading(false);
