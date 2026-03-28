@@ -47,8 +47,10 @@ if (process.env.NODE_ENV === "production") {
 
 // 🌐 3. CORS Configuration (OWASP A01: Broken Access Control)
 const allowedOrigins = [
-  "http://localhost:5173",          // Local Development
-  "https://whyitshop.vercel.app"    // Production บน Vercel
+  "http://localhost:5173",              // Local Development Frontend
+  "http://localhost:5000",              // Local Development Backend
+  "https://whyitshop.vercel.app",       // Production Frontend (Vercel)
+  "https://whyitshop.onrender.com"      // Production Backend (Render)
 ];
 
 app.use(cors({
