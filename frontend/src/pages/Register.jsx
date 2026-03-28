@@ -78,48 +78,32 @@ function Register() {
       setLoading(true);
 
       // 2. สมัครสมาชิกใน Auth
+      // ⚠️ Email verification ปิดชั่วคราว (rate limit exceeded)
+      // จะเปิดใหม่เมื่อเพิ่มธรรมชาติ SendGrid
       const { data, error } = await supabase.auth.signUp({
         email: formData.email.trim(),
         password: formData.password,
         options: {
           data: {
             full_name: `${formData.firstName} ${formData.lastName}`,
-            username: formData.username
+            username: formData.username,
+            firstname: formData.firstName,
+            lastname: formData.lastName,
+            phone: formData.phone,
+            address: formData.address
           }
         }
       });
 
       if (error) throw error;
 
+      // ✅ Trigger จะ auto create users record เมื่อมี auth.users ใหม่
       if (data?.user) {
-        // ✅ บันทึกข้อมูล user ลงตาราง users (ครบตามโครงสร้าง)
-        const { error: insertError } = await supabase
-          .from("users")
-          .insert([
-            {
-              id: data.user.id,
-              email: formData.email.trim(),
-              username: formData.username,
-              firstname: formData.firstName,
-              lastname: formData.lastName,
-              phone: formData.phone,
-              address: formData.address,
-              role: "user",
-              newsletter: false,
-              avatar: null
-            }
-          ]);
-
-        if (insertError) {
-          console.error("Insert user error:", insertError);
-          throw insertError;
-        }
-
-        alert("🎉 สมัครสมาชิกสำเร็จ!");
-        window.location.href = "/"; 
-      } else {
-        alert("📧 กรุณาตรวจสอบอีเมลเพื่อยืนยันการสมัครสมาชิก");
+        // ✅ แสดง message สมัครสำเร็จ
+        alert("✅ สมัครสมาชิกสำเร็จ!\n\nกรุณา Login เข้าสู่ระบบ");
         navigate("/login");
+      } else {
+        alert("⚠️ ไม่สามารถสมัครสมาชิกได้ กรุณาลองใหม่");
       }
 
     } catch (err) {
