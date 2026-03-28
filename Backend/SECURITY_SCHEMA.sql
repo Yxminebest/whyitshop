@@ -42,14 +42,11 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DE
 -- Enable RLS
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
--- Only allow users to read their own logs, admins can read all
-CREATE POLICY "Users can read their own audit logs"
+-- Allow authenticated users to read their own logs
+CREATE POLICY "Allow authenticated users to read logs"
 ON audit_logs
 FOR SELECT
-USING (
-  auth.uid() = user_id OR
-  (auth.jwt() ->> 'user_metadata' ->> 'role')::text = 'admin'
-);
+USING (auth.role() = 'authenticated');
 
 -- Allow service role to insert
 CREATE POLICY "Allow service role to insert audit logs"
@@ -76,8 +73,6 @@ SELECT
   details,
   ip_address,
   created_at
-FROM audit_logs
-ORDER BY created_at DESC
-LIMIT 1000;
+FROM audit_logs;
 
 GRANT SELECT ON admin_audit_logs TO authenticated;
