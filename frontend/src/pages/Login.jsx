@@ -7,6 +7,7 @@ function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -106,16 +107,39 @@ function Login() {
             required
           />
 
-          <input
-            type="password"
-            placeholder="รหัสผ่าน (Password)"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="input-glass"
-            style={{ textAlign: "left" }}
-            autoComplete="current-password"
-            required
-          />
+          <div style={{ position: "relative" }}>
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="รหัสผ่าน (Password)"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="input-glass"
+              style={{ textAlign: "left", paddingRight: "40px" }}
+              autoComplete="current-password"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: "absolute",
+                right: "12px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                fontSize: "18px",
+                color: "var(--text-muted)",
+                padding: "4px 8px",
+                transition: "0.3s",
+              }}
+              onMouseEnter={(e) => e.target.style.color = "var(--primary)"}
+              onMouseLeave={(e) => e.target.style.color = "var(--text-muted)"}
+            >
+              {showPassword ? "👁️" : "👁️‍🗨️"}
+            </button>
+          </div>
 
           <div style={{ textAlign: "right", marginTop: "-5px" }}>
             <Link to="/forgot-password" style={{ color: "var(--primary)", fontSize: "14px", textDecoration: "none", fontWeight: "bold" }}>

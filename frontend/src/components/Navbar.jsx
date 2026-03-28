@@ -130,7 +130,6 @@ function Navbar({ theme, toggleTheme }) {
         {user ? (
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
             <div style={{ display: "flex", gap: "5px" }}>
-                <button onClick={() => navigate("/my-orders")} title="My Orders" style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: "18px" }}>📦</button>
                 <button onClick={() => navigate("/profile")} title="Settings" style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: "18px" }}>⚙️</button>
             </div>
             
@@ -200,37 +199,58 @@ function Navbar({ theme, toggleTheme }) {
             >
               🛍️ Products
             </button>
-            <button
-              className={`nav-link ${location.pathname === "/coupons" ? "active" : ""}`}
-              onClick={() => navigate("/coupons")}
-              style={{ 
-                background: location.pathname === "/coupons" ? "var(--primary)" : "transparent",
-                color: location.pathname === "/coupons" ? "white" : "var(--text-main)",
-                padding: "8px 18px", border: "none", borderRadius: "25px", cursor: "pointer", fontWeight: "bold", transition: "0.3s"
-              }}
-            >
-              🎟️ Coupons
-            </button>
 
-            {/* 🛒 CART BUTTON (Moved here) */}
-            <button
-              onClick={() => navigate("/cart")}
-              style={{ 
-                background: location.pathname === "/cart" ? "var(--primary)" : "rgba(0, 212, 255, 0.1)",
-                color: location.pathname === "/cart" ? "white" : "#00d4ff",
-                padding: "8px 18px", 
-                border: "1px solid #00d4ff", 
-                borderRadius: "25px", 
-                cursor: "pointer", 
-                fontWeight: "900",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                transition: "0.3s"
-              }}
-            >
-              🛒 <span style={{ fontSize: "14px" }}>Cart ({cartCount})</span>
-            </button>
+            {/* 🎟️ COUPONS - Show only when logged in */}
+            {user && (
+              <button
+                className={`nav-link ${location.pathname === "/coupons" ? "active" : ""}`}
+                onClick={() => navigate("/coupons")}
+                style={{ 
+                  background: location.pathname === "/coupons" ? "var(--primary)" : "transparent",
+                  color: location.pathname === "/coupons" ? "white" : "var(--text-main)",
+                  padding: "8px 18px", border: "none", borderRadius: "25px", cursor: "pointer", fontWeight: "bold", transition: "0.3s"
+                }}
+              >
+                🎟️ Coupons
+              </button>
+            )}
+
+            {/* 📦 MY ORDERS - Show only when logged in */}
+            {user && (
+              <button
+                className={`nav-link ${location.pathname === "/my-orders" ? "active" : ""}`}
+                onClick={() => navigate("/my-orders")}
+                style={{ 
+                  background: location.pathname === "/my-orders" ? "var(--primary)" : "transparent",
+                  color: location.pathname === "/my-orders" ? "white" : "var(--text-main)",
+                  padding: "8px 18px", border: "none", borderRadius: "25px", cursor: "pointer", fontWeight: "bold", transition: "0.3s"
+                }}
+              >
+                📦 My Orders
+              </button>
+            )}
+
+            {/* 🛒 CART BUTTON - Show only when logged in */}
+            {user && (
+              <button
+                onClick={() => navigate("/cart")}
+                style={{ 
+                  background: location.pathname === "/cart" ? "var(--primary)" : "rgba(0, 212, 255, 0.1)",
+                  color: location.pathname === "/cart" ? "white" : "#00d4ff",
+                  padding: "8px 18px", 
+                  border: "1px solid #00d4ff", 
+                  borderRadius: "25px", 
+                  cursor: "pointer", 
+                  fontWeight: "900",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  transition: "0.3s"
+                }}
+              >
+                🛒 <span style={{ fontSize: "14px" }}>Cart ({cartCount})</span>
+              </button>
+            )}
 
             {/* Admin Menu Section */}
             {user && userRole === "admin" && (
