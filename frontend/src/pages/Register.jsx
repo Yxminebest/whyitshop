@@ -112,7 +112,7 @@ function Register() {
         setTimeout(async () => {
           try {
             // ใช้ /api path ธรรมดา Vite proxy จะ forward ไป localhost:5000
-            const emailResponse = await fetch('/api/auth/send-welcome-email', {
+            const emailResponse = await fetch(`${import.meta.env.VITE_API_URL}/auth/send-welcome-email`, {
               method: 'POST',
               headers: { 
                 'Content-Type': 'application/json'

@@ -61,7 +61,7 @@ function AdminOrders() {
       setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status: newStatus } : o)));
 
       // ✅ ส่ง Status Update Email (non-blocking)
-      fetch('/api/auth/send-status-update', {
+      fetch(`${import.meta.env.VITE_API_URL}/auth/send-status-update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderId: id, newStatus })
