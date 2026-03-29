@@ -12,6 +12,9 @@ function AdminUsers() {
   const [editingUser, setEditingUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState("user");
+  const [page, setPage] = useState(1); // ✅ pagination
+  const [pageSize] = useState(10); // Show 10 users per page
+  const [totalUsers, setTotalUsers] = useState(0);
 
   useEffect(() => {
     checkAdmin();
@@ -21,7 +24,7 @@ function AdminUsers() {
     if (!authLoading && authUser) {
       fetchUsers();
     }
-  }, [authUser, authLoading]);
+  }, [authUser, authLoading, page]); // ✅ fetch when page changes
 
   const checkAdmin = async () => {
     if (!authUser?.id) {
@@ -44,22 +47,43 @@ function AdminUsers() {
     }
   };
 
-  // เรียกผ่าน Backend แทน Supabase โดยตรง
+  // ✅ Fetch with pagination
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/users`);
+      const offset = (page - 1) * pageSize;
+      const res = await fetch(`${API_URL}/users?limit=${pageSize}&offset=${offset}`);
+      
+      // Check if response is HTML (error) or JSON
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error(`Server error: ${res.status} ${res.statusText}`);
+      }
+      
       const data = await res.json();
-      setUsers(data || []);
+      
+      // Handle response - expect { users: [], total: count }
+      if (data && data.users && typeof data.total === 'number') {
+        setUsers(data.users);
+        setTotalUsers(data.total);
+      } else if (Array.isArray(data)) {
+        // Fallback: if response is array, just show what we get
+        setUsers(data);
+        setTotalUsers(data.length);
+      } else {
+        throw new Error("Invalid response format from server");
+      }
     } catch (err) {
       console.error("Fetch error:", err.message);
+      setUsers([]);
+      setTotalUsers(0);
+      alert("❌ โหลดข้อมูลผู้ใช้ไม่สำเร็จ\n\nข้อผิดพลาด: " + err.message + "\n\nกรุณาตรวจสอบ Backend server");
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleRole = async (id, currentRole) => {
-    const newRole = currentRole === "admin" ? "user" : "admin";
+  const changeRole = async (id, newRole) => {
     if (!window.confirm(`⚠️ ยืนยันการเปลี่ยนสิทธิ์เป็น ${newRole.toUpperCase()}?`)) return;
 
     try {
@@ -68,9 +92,14 @@ function AdminUsers() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role: newRole }),
       });
-      if (res.ok) fetchUsers();
+      if (res.ok) {
+        alert("✅ เปลี่ยน Role เรียบร้อย");
+        fetchUsers();
+      } else {
+        alert("❌ เปลี่ยน Role ไม่สำเร็จ");
+      }
     } catch (err) {
-      alert("❌ เปลี่ยน Role ไม่สำเร็จ");
+      alert("❌ เปลี่ยน Role ไม่สำเร็จ: " + err.message);
     }
   };
 
@@ -93,14 +122,18 @@ function AdminUsers() {
         body: JSON.stringify({
           username: editingUser.username,
           phone: editingUser.phone,
+          role: editingUser.role || "user"  // ✅ บันทึก role ด้วย
         }),
       });
       if (res.ok) {
+        alert("✅ บันทึกข้อมูลเรียบร้อย");
         setEditingUser(null);
         fetchUsers();
+      } else {
+        alert("❌ บันทึกไม่สำเร็จ");
       }
     } catch (err) {
-      alert("❌ บันทึกไม่สำเร็จ");
+      alert("❌ บันทึกไม่สำเร็จ: " + err.message);
     }
   };
 
@@ -184,18 +217,37 @@ function AdminUsers() {
                     )}
                   </td>
                   <td style={{ padding: "15px", textAlign: "center" }}>
-                    <span
-                      style={{
-                        background: user.role === "admin" ? "var(--primary)" : "#2ed573",
-                        color: "white",
-                        padding: "6px 12px",
-                        borderRadius: "20px",
-                        fontSize: "12px",
-                        fontWeight: "bold"
-                      }}
-                    >
-                      {user.role?.toUpperCase() || "USER"}
-                    </span>
+                    {editingUser?.id === user.id ? (
+                      <select
+                        value={editingUser.role || "user"}
+                        onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
+                        style={{
+                          padding: "6px 8px",
+                          borderRadius: "6px",
+                          border: "1px solid var(--card-border)",
+                          background: "var(--bg-secondary)",
+                          color: "var(--text-main)",
+                          cursor: "pointer"
+                        }}
+                      >
+                        <option value="user">User</option>
+                        <option value="store_owner">Store Owner</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    ) : (
+                      <span
+                        style={{
+                          background: user.role === "admin" ? "var(--primary)" : user.role === "store_owner" ? "#f59e0b" : "#2ed573",
+                          color: "white",
+                          padding: "6px 12px",
+                          borderRadius: "20px",
+                          fontSize: "12px",
+                          fontWeight: "bold"
+                        }}
+                      >
+                        {user.role === "admin" ? "👑 ADMIN" : user.role === "store_owner" ? "🏪 STORE OWNER" : "👤 USER"}
+                      </span>
+                    )}
                   </td>
                   <td style={{ padding: "15px", textAlign: "center", display: "flex", gap: "8px", justifyContent: "center" }}>
                     {editingUser?.id === user.id ? (
@@ -249,7 +301,7 @@ function AdminUsers() {
                           ✏️ Edit
                         </button>
                         <button
-                          onClick={() => toggleRole(user.id, user.role)}
+                          onClick={() => changeRole(user.id, user.role === "admin" ? "user" : "admin")}
                           style={{
                             background: "#ffa502",
                             color: "white",
@@ -285,6 +337,29 @@ function AdminUsers() {
               ))}
             </tbody>
           </table>
+
+          {/* ✅ Pagination Controls */}
+          <div style={{ display: "flex", justifyContent: "center", gap: "10px", marginTop: "30px", alignItems: "center" }}>
+            <button 
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={page === 1}
+              style={{ padding: "8px 12px", cursor: page === 1 ? "not-allowed" : "pointer", opacity: page === 1 ? 0.5 : 1 }}
+            >
+              ← Previous
+            </button>
+            
+            <span style={{ color: "white", fontSize: "14px", fontWeight: "bold" }}>
+              Page {page} of {Math.ceil(totalUsers / pageSize)} (Total: {totalUsers} users)
+            </span>
+            
+            <button 
+              onClick={() => setPage(page + 1)}
+              disabled={page * pageSize >= totalUsers}
+              style={{ padding: "8px 12px", cursor: page * pageSize >= totalUsers ? "not-allowed" : "pointer", opacity: page * pageSize >= totalUsers ? 0.5 : 1 }}
+            >
+              Next →
+            </button>
+          </div>
         </div>
       )}
     </div>

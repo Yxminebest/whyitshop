@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import { logAction } from "../utils/logger";
+import NotificationCenter from "./NotificationCenter";
 
 function Navbar({ theme, toggleTheme }) {
   const navigate = useNavigate();
@@ -130,6 +131,7 @@ function Navbar({ theme, toggleTheme }) {
         {user ? (
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
             <div style={{ display: "flex", gap: "5px" }}>
+                <NotificationCenter />
                 <button onClick={() => navigate("/profile")} title="Settings" style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: "18px" }}>⚙️</button>
             </div>
             
@@ -272,6 +274,31 @@ function Navbar({ theme, toggleTheme }) {
                     <button onClick={() => { navigate("/admin/dashboard"); setAdminDropdown(false); }} style={{ width: "100%", padding: "12px", textAlign: "left", background: "transparent", border: "none", color: "var(--text-main)", cursor: "pointer", borderBottom: "1px solid var(--card-border)" }}>📊 Dashboard</button>
                     <button onClick={() => { navigate("/admin/users"); setAdminDropdown(false); }} style={{ width: "100%", padding: "12px", textAlign: "left", background: "transparent", border: "none", color: "var(--text-main)", cursor: "pointer", borderBottom: "1px solid var(--card-border)" }}>👥 Users</button>
                     <button onClick={() => { navigate("/admin/orders"); setAdminDropdown(false); }} style={{ width: "100%", padding: "12px", textAlign: "left", background: "transparent", border: "none", color: "var(--text-main)", cursor: "pointer" }}>📦 Orders</button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Store Owner Menu Section */}
+            {user && userRole === "store_owner" && (
+              <div style={{ position: "relative" }}>
+                <button
+                  onClick={() => setAdminDropdown(!adminDropdown)}
+                  style={{ 
+                    background: adminDropdown ? "#333" : "transparent",
+                    color: adminDropdown ? "white" : "var(--text-main)",
+                    padding: "8px 18px", border: "none", borderRadius: "25px", cursor: "pointer", fontWeight: "bold", display: "flex", alignItems: "center", gap: "5px"
+                  }}
+                >
+                  🏪 Store {adminDropdown ? "▲" : "▼"}
+                </button>
+                {adminDropdown && (
+                  <div style={{
+                    position: "absolute", top: "110%", left: "50%", transform: "translateX(-50%)", background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: "12px", boxShadow: "0 8px 20px rgba(0,0,0,0.2)", minWidth: "200px", zIndex: 100, overflow: "hidden"
+                  }}>
+                    <button onClick={() => { navigate("/store/dashboard"); setAdminDropdown(false); }} style={{ width: "100%", padding: "12px", textAlign: "left", background: "transparent", border: "none", color: "var(--text-main)", cursor: "pointer", borderBottom: "1px solid var(--card-border)" }}>📊 Dashboard</button>
+                    <button onClick={() => { navigate("/store/orders"); setAdminDropdown(false); }} style={{ width: "100%", padding: "12px", textAlign: "left", background: "transparent", border: "none", color: "var(--text-main)", cursor: "pointer", borderBottom: "1px solid var(--card-border)" }}>📦 Orders</button>
+                    <button onClick={() => { navigate("/store/coupons"); setAdminDropdown(false); }} style={{ width: "100%", padding: "12px", textAlign: "left", background: "transparent", border: "none", color: "var(--text-main)", cursor: "pointer" }}>🎫 Coupons</button>
                   </div>
                 )}
               </div>

@@ -55,6 +55,9 @@ function Register() {
 
   const passwordStrength = checkPasswordStrength(formData.password);
 
+  // ✅ ตรวจสอบว่า password เป็น Strong หรือไม่
+  const isPasswordStrong = passwordStrength.strength >= 4;
+
   const handleRegister = async (e) => {
     e.preventDefault();
     setErrorMsg("");
@@ -67,6 +70,11 @@ function Register() {
 
     if (formData.password !== formData.confirmPassword) {
       return setErrorMsg("❌ รหัสผ่านไม่ตรงกัน");
+    }
+
+    // ✅ บังคับให้เป็น Strong password (level 4 หรือ 5)
+    if (!isPasswordStrong) {
+      return setErrorMsg("⚠️ รหัสผ่านต้องเป็น 'Strong' ขึ้นไป (ต้องมี ตัวพิมพ์ใหญ่ ตัวพิมพ์เล็ก ตัวเลข และอักขระพิเศษ)");
     }
 
     const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
@@ -99,6 +107,31 @@ function Register() {
 
       // ✅ Trigger จะ auto create users record เมื่อมี auth.users ใหม่
       if (data?.user) {
+        // ✅ Send welcome email via backend (fire and forget - ไม่ block registration)
+        // ใช้ setTimeout เพื่อส่งแบบ async
+        setTimeout(async () => {
+          try {
+            // ใช้ /api path ธรรมดา Vite proxy จะ forward ไป localhost:5000
+            const emailResponse = await fetch('/api/auth/send-welcome-email', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                email: formData.email,
+                firstName: formData.firstName
+              })
+            });
+            if (emailResponse.ok) {
+              console.log('✅ Welcome email sent successfully');
+            } else {
+              console.log('Email API returned:', emailResponse.status);
+            }
+          } catch (emailErr) {
+            console.log('Email send error (non-blocking):', emailErr.message);
+          }
+        }, 100); // Send email after 100ms
+
         // ✅ แสดง message สมัครสำเร็จ
         alert("✅ สมัครสมาชิกสำเร็จ!\n\nกรุณา Login เข้าสู่ระบบ");
         navigate("/login");
@@ -163,34 +196,83 @@ function Register() {
             </button>
           </div>
 
-          {/* Password Strength Indicator */}
+          {/* Password Strength Indicator with Details */}
           {formData.password && (
             <div style={{
               display: "flex",
-              alignItems: "center",
-              gap: "10px",
+              flexDirection: "column",
+              gap: "8px",
               fontSize: "12px",
               color: "var(--text-muted)",
             }}>
               <div style={{
-                flex: 1,
-                height: "4px",
-                background: "var(--bg-secondary)",
-                borderRadius: "2px",
-                overflow: "hidden",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
               }}>
-                <div
-                  style={{
-                    height: "100%",
-                    width: `${(passwordStrength.strength / 5) * 100}%`,
-                    background: passwordStrength.color,
-                    transition: "all 0.3s ease",
-                  }}
-                />
+                <div style={{
+                  flex: 1,
+                  height: "6px",
+                  background: "var(--bg-secondary)",
+                  borderRadius: "3px",
+                  overflow: "hidden",
+                }}>
+                  <div
+                    style={{
+                      height: "100%",
+                      width: `${(passwordStrength.strength / 5) * 100}%`,
+                      background: passwordStrength.color,
+                      transition: "all 0.3s ease",
+                      boxShadow: `0 0 8px ${passwordStrength.color}`,
+                    }}
+                  />
+                </div>
+                <span style={{ color: passwordStrength.color, fontWeight: "700", minWidth: "80px", textAlign: "right" }}>
+                  {passwordStrength.label}
+                  {isPasswordStrong && " ✅"}
+                </span>
               </div>
-              <span style={{ color: passwordStrength.color, fontWeight: "600", minWidth: "60px" }}>
-                {passwordStrength.label}
-              </span>
+              
+              {/* Requirements checklist */}
+              <div style={{ background: "rgba(0,0,0,0.1)", padding: "8px 12px", borderRadius: "6px", fontSize: "11px" }}>
+                <p style={{ margin: "0 0 6px 0", fontWeight: "600" }}>ความยาว:</p>
+                <div style={{ marginLeft: "8px", display: "flex", gap: "4px", alignItems: "center" }}>
+                  <span style={{ color: formData.password.length >= 8 ? "#22c55e" : "#ff4757" }}>
+                    {formData.password.length >= 8 ? "✅" : "❌"}
+                  </span>
+                  <span>อย่างน้อย 8 ตัวอักษร ({formData.password.length}/8)</span>
+                </div>
+                
+                <p style={{ margin: "6px 0 6px 0", fontWeight: "600" }}>ตัวอักษร:</p>
+                <div style={{ marginLeft: "8px", display: "flex", flexDirection: "column", gap: "2px" }}>
+                  <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                    <span style={{ color: /[a-z]/.test(formData.password) ? "#22c55e" : "#ff4757" }}>
+                      {/[a-z]/.test(formData.password) ? "✅" : "❌"}
+                    </span>
+                    <span>ตัวอักษรตัวเล็ก (a-z)</span>
+                  </div>
+                  <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                    <span style={{ color: /[A-Z]/.test(formData.password) ? "#22c55e" : "#ff4757" }}>
+                      {/[A-Z]/.test(formData.password) ? "✅" : "❌"}
+                    </span>
+                    <span>ตัวอักษรตัวใหญ่ (A-Z)</span>
+                  </div>
+                  <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                    <span style={{ color: /\d/.test(formData.password) ? "#22c55e" : "#ff4757" }}>
+                      {/\d/.test(formData.password) ? "✅" : "❌"}
+                    </span>
+                    <span>ตัวเลข (0-9)</span>
+                  </div>
+                  <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                    <span style={{ color: /[^a-zA-Z\d]/.test(formData.password) ? "#22c55e" : "#999" }}>
+                      {/[^a-zA-Z\d]/.test(formData.password) ? "✅" : "○"}
+                    </span>
+                    <span style={{ color: /[^a-zA-Z\d]/.test(formData.password) ? "#22c55e" : "#999" }}>
+                      อักขระพิเศษ (!@#$%...) <span style={{ fontSize: "10px" }}>(ทำให้เป็น Very Strong)</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -228,8 +310,19 @@ function Register() {
             </button>
           </div>
 
-          <button className="btn-primary" type="submit" disabled={loading} style={{ padding: "15px", marginTop: "10px" }}>
-            {loading ? "กำลังสมัคร..." : "REGISTER NOW"}
+          <button 
+            className="btn-primary" 
+            type="submit" 
+            disabled={loading || !isPasswordStrong}
+            style={{ 
+              padding: "15px", 
+              marginTop: "10px",
+              opacity: (!isPasswordStrong && formData.password) ? 0.5 : 1,
+              cursor: (!isPasswordStrong && formData.password) ? "not-allowed" : "pointer"
+            }}
+            title={!isPasswordStrong && formData.password ? "กรุณาใช้ Strong password" : ""}
+          >
+            {loading ? "กำลังสมัคร..." : (formData.password && !isPasswordStrong ? "⚠️ รอให้ password เป็น Strong" : "REGISTER NOW")}
           </button>
         </form>
 

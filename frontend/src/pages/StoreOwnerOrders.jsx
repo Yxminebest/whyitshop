@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-function AdminOrders() {
+function StoreOwnerOrders() {
   const navigate = useNavigate();
   const { user: authUser, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState([]);
@@ -13,12 +13,12 @@ function AdminOrders() {
 
   useEffect(() => {
     if (!authLoading && authUser) {
-      checkAdmin();
+      checkStoreOwner();
       fetchOrders();
     }
   }, [authUser, authLoading]);
 
-  const checkAdmin = async () => {
+  const checkStoreOwner = async () => {
     if (!authUser?.id) {
       navigate("/login");
       return;
@@ -26,63 +26,153 @@ function AdminOrders() {
 
     try {
       const { data } = await supabase.from("users").select("role").eq("id", authUser.id).maybeSingle();
-      if (!data || data.role !== "admin") {
+      if (!data || (data.role !== "store_owner" && data.role !== "admin")) {
         alert("❌ คุณไม่มีสิทธิ์เข้าถึงหน้านี้");
         navigate("/");
       }
     } catch (err) {
-      console.error("Admin check error:", err);
+      console.error("Store owner check error:", err);
       navigate("/");
     }
   };
 
   const fetchOrders = async () => {
     try {
-      const { data } = await supabase.from("orders").select(`*, order_items (*)`).order("created_at", { ascending: false });
-      setOrders(data || []);
+      setLoading(true);
+
+      // ดึงสินค้าของร้านตัวเอง
+      const { data: myProducts } = await supabase
+        .from("products")
+        .select("id")
+        .eq("store_owner_id", authUser.id);
+
+      const productIds = myProducts?.map(p => p.id) || [];
+
+      if (productIds.length === 0) {
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
+
+      // ดึงออเดอร์ทั้งหมด
+      const { data: allOrders, error } = await supabase
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Fetch orders error:", error);
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
+
+      // ดึง order_items แยก
+      const { data: allOrderItems, error: itemsError } = await supabase
+        .from("order_items")
+        .select("*");
+
+      if (itemsError) {
+        console.error("Fetch order_items error:", itemsError);
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
+
+      // Join orders + order_items
+      const ordersWithItems = allOrders?.map((order) => ({
+        ...order,
+        order_items: allOrderItems?.filter((item) => item.order_id === order.id) || []
+      })) || [];
+
+      // Filter ออเดอร์ที่มีสินค้าของร้านตัวเอง
+      const filteredOrders = ordersWithItems.filter((order) => {
+        const hasMyProducts = order.order_items?.some((item) => 
+          productIds.includes(item.product_id)
+        );
+        return hasMyProducts;
+      });
+
+      console.log("✅ Fetched real orders:", filteredOrders.length, "orders found");
+      setOrders(filteredOrders);
     } catch (err) {
       console.error("Fetch orders error:", err);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // 🔥 แก้ไขฟังก์ชันนี้: เช็กว่าถ้าเป็นลิงก์เต็มอยู่แล้ว ให้ใช้ได้เลย
   const getSlipUrl = (path) => {
     if (!path) return null;
-    if (path.startsWith("http")) return path; 
+    if (path.startsWith("http")) return path;
     return supabase.storage.from("slips").getPublicUrl(path).data.publicUrl;
   };
 
   const updateStatus = async (id, newStatus) => {
     setUpdatingId(id);
-    const { error } = await supabase.from("orders").update({ status: newStatus }).eq("id", id);
-    if (!error) {
-      setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status: newStatus } : o)));
+    try {
+      // อัปเดต Supabase
+      const { error } = await supabase.from("orders").update({ status: newStatus }).eq("id", id);
+      if (!error) {
+        // อัปเดต UI ทันที
+        setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status: newStatus } : o)));
+        alert("✅ อัปเดตสถานะแล้ว");
 
-      // ✅ ส่ง Status Update Email (non-blocking)
-      fetch('/api/auth/send-status-update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: id, newStatus })
-      })
-        .then(r => r.json())
-        .then(data => console.log('📧 Status email:', data.message))
-        .catch(err => console.log('Email error (non-blocking):', err.message));
+        // ✅ ส่ง Status Update Email (non-blocking)
+        fetch('/api/auth/send-status-update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: id, newStatus })
+        })
+          .then(r => r.json())
+          .then(data => console.log('📧 Status email:', data.message))
+          .catch(err => console.log('Email error (non-blocking):', err.message));
+        
+        // Refetch ข้อมูลใหม่เพื่อให้มั่นใจว่าตรงกับฐานข้อมูล
+        setTimeout(fetchOrders, 500);
+      } else {
+        alert("❌ ไม่สามารถอัปเดตได้");
+        console.error("Update error:", error);
+      }
+    } catch (err) {
+      console.error("Update status error:", err);
+      alert("❌ เกิดข้อผิดพลาด");
+    } finally {
+      setUpdatingId(null);
     }
-    setUpdatingId(null);
   };
 
   const getStatusStyle = (status) => {
-    const colors = { pending: "#facc15", paid: "#38bdf8", shipped: "#a78bfa", completed: "#22c55e", cancelled: "#ef4444" };
-    return { background: `${colors[status] || "#fff"}20`, color: colors[status], padding: "6px 12px", borderRadius: "20px", fontSize: "13px", fontWeight: "bold", border: `1px solid ${colors[status]}50` };
+    const colors = {
+      pending: "#facc15",
+      paid: "#38bdf8",
+      shipped: "#a78bfa",
+      completed: "#22c55e",
+      cancelled: "#ef4444"
+    };
+    return {
+      background: `${colors[status] || "#fff"}20`,
+      color: colors[status],
+      padding: "6px 12px",
+      borderRadius: "20px",
+      fontSize: "13px",
+      fontWeight: "bold",
+      border: `1px solid ${colors[status]}50`
+    };
   };
 
   return (
     <div className="page-container">
-      <h1 style={{ marginBottom: "30px" }}>📦 จัดการคำสั่งซื้อ (Orders)</h1>
+      <h1 style={{ marginBottom: "30px" }}>📦 จัดการคำสั่งซื้อสินค้า</h1>
 
-      {loading ? <p style={{ color: "var(--text-muted)" }}>กำลังโหลดออเดอร์...</p> : (
+      {loading ? (
+        <p style={{ color: "var(--text-muted)" }}>กำลังโหลดออเดอร์...</p>
+      ) : orders.length === 0 ? (
+        <p style={{ color: "var(--text-muted)", textAlign: "center", padding: "50px 0" }}>
+          ยังไม่มีออเดอร์สินค้าของคุณ
+        </p>
+      ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           {orders.map((order) => {
             const slipUrl = getSlipUrl(order.slip_url || order.slip);
@@ -145,4 +235,4 @@ function AdminOrders() {
   );
 }
 
-export default AdminOrders;
+export default StoreOwnerOrders;

@@ -4,9 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { sanitizeInput } from "../utils/sanitize";
 import { formatPrice, removeComma } from "../utils/formatPrice";
-import { uploadImage } from "../utils/uploadImage"; 
+import { uploadImage } from "../utils/uploadImage";
 
-function AdminDashboard() {
+function StoreOwnerDashboard() {
   const navigate = useNavigate();
   const { user: authUser, loading: authLoading } = useAuth();
 
@@ -20,29 +20,23 @@ function AdminDashboard() {
   const [editId, setEditId] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // ✅ Coupon states
-  const [couponCode, setCouponCode] = useState("");
-  const [couponType, setCouponType] = useState("percent");
-  const [couponValue, setCouponValue] = useState("");
-  const [coupons, setCoupons] = useState([]); // ✅ List of coupons
-  const [editingCoupon, setEditingCoupon] = useState(null); // ✅ Editing coupon
-
   const [stats, setStats] = useState({
     totalProducts: 0,
-    totalUsers: 0,
+    totalCoupons: 0,
     totalOrders: 0,
-    totalCoupons: 0
+    pendingOrders: 0,
+    completedOrders: 0
   });
 
   useEffect(() => {
     if (!authLoading && authUser) {
-      checkAdmin();
+      checkStoreOwner();
       fetchProducts();
       fetchStats();
     }
   }, [authUser, authLoading]);
 
-  const checkAdmin = async () => {
+  const checkStoreOwner = async () => {
     if (!authUser?.id) {
       navigate("/login");
       return;
@@ -50,49 +44,92 @@ function AdminDashboard() {
 
     try {
       const { data } = await supabase.from("users").select("role").eq("id", authUser.id).maybeSingle();
-      if (!data || data.role !== "admin") {
+      if (!data || (data.role !== "store_owner" && data.role !== "admin")) {
         alert("❌ คุณไม่มีสิทธิ์เข้าถึงหน้านี้");
         navigate("/");
       }
     } catch (err) {
-      console.error("Admin check error:", err);
+      console.error("Store owner check error:", err);
       navigate("/");
     }
   };
 
-  // ดึงสถิติ
+  const fetchProducts = async () => {
+    try {
+      const { data } = await supabase
+        .from("products")
+        .select("*")
+        .eq("store_owner_id", authUser.id)
+        .order("created_at", { ascending: false });
+
+      setProducts(data || []);
+    } catch (err) {
+      console.error("Fetch products error:", err);
+    }
+  };
+
   const fetchStats = async () => {
     try {
-      const { data: allProducts } = await supabase.from("products").select("id");
-      const { data: allUsers } = await supabase.from("users").select("id");
-      const { data: allOrders } = await supabase.from("orders").select("id");
-      const { data: allCoupons } = await supabase.from("coupons").select("*");
+      const { data: myProducts } = await supabase
+        .from("products")
+        .select("id")
+        .eq("store_owner_id", authUser.id);
+
+      const { data: coupons } = await supabase
+        .from("coupons")
+        .select("id")
+        .eq("store_owner_id", authUser.id);
+
+      const productIds = myProducts?.map(p => p.id) || [];
+
+      // ดึงออเดอร์จริง
+      let totalOrders = 0;
+      let pendingOrders = 0;
+      let completedOrders = 0;
+
+      if (productIds.length > 0) {
+        const { data: allOrders } = await supabase
+          .from("orders")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        const { data: allOrderItems } = await supabase
+          .from("order_items")
+          .select("*");
+
+        // Join orders + order_items
+        const ordersWithItems = allOrders?.map((order) => ({
+          ...order,
+          order_items: allOrderItems?.filter((item) => item.order_id === order.id) || []
+        })) || [];
+
+        const filteredOrders = ordersWithItems.filter((order) => {
+          const hasMyProducts = order.order_items?.some((item) => 
+            productIds.includes(item.product_id)
+          );
+          return hasMyProducts;
+        });
+
+        totalOrders = filteredOrders.length;
+        pendingOrders = filteredOrders.filter(o => o.status === "pending").length;
+        completedOrders = filteredOrders.filter(o => o.status === "completed").length;
+      }
 
       setStats({
-        totalProducts: allProducts?.length || 0,
-        totalUsers: allUsers?.length || 0,
-        totalOrders: allOrders?.length || 0,
-        totalCoupons: allCoupons?.length || 0
+        totalProducts: myProducts?.length || 0,
+        totalCoupons: coupons?.length || 0,
+        totalOrders,
+        pendingOrders,
+        completedOrders
       });
-      
-      setCoupons(allCoupons || []); // ✅ Load coupons list
     } catch (err) {
       console.error("Fetch stats error:", err);
     }
   };
 
-  const fetchProducts = async () => {
-    const { data } = await supabase
-      .from("products")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    setProducts(data || []);
-  };
-
   const saveProduct = async () => {
-    if (!name || !price || !category || !description) {
-      return alert("❌ กรอกข้อมูลให้ครบ");
+    if (!name || !price || !category || !description || !stock) {
+      return alert("❌ กรอกข้อมูลให้ครบ (รวม stock)");
     }
 
     try {
@@ -120,7 +157,6 @@ function AdminDashboard() {
 
         alert("✅ แก้ไขสินค้าแล้ว");
         setEditId(null);
-
       } else {
         if (!imageUrl) return alert("❌ ต้องใส่รูป");
 
@@ -129,8 +165,9 @@ function AdminDashboard() {
           price: Number(removeComma(price)),
           stock: Number(stock), // ✅ Save stock
           category,
+          description: sanitizeInput(description),
           image: imageUrl,
-          description: sanitizeInput(description)
+          store_owner_id: authUser.id
         }]);
 
         alert("✅ เพิ่มสินค้าแล้ว");
@@ -178,94 +215,26 @@ function AdminDashboard() {
     setEditId(null);
   };
 
-  // ✅ Create coupon
-  const createCoupon = async () => {
-    if (!couponCode || !couponValue) {
-      return alert("❌ กรอกข้อมูลให้ครบ");
-    }
-
-    try {
-      if (editingCoupon) {
-        // ✅ Update coupon
-        await supabase.from("coupons").update({
-          code: sanitizeInput(couponCode.toUpperCase()),
-          type: couponType,
-          value: Number(couponValue)
-        }).eq("id", editingCoupon.id);
-
-        alert("✅ อัปเดตคูปองสำเร็จ");
-        setEditingCoupon(null);
-      } else {
-        // ✅ Create coupon
-        await supabase.from("coupons").insert([{
-          code: sanitizeInput(couponCode.toUpperCase()),
-          type: couponType,
-          value: Number(couponValue),
-          is_active: true,
-          store_owner_id: null // Admin creates global coupons
-        }]);
-
-        alert("✅ สร้างคูปองสำเร็จ");
-      }
-
-      setCouponCode("");
-      setCouponValue("");
-      setCouponType("percent");
-      fetchStats(); // Reload coupons list
-    } catch (err) {
-      alert("❌ " + (editingCoupon ? "อัปเดต" : "สร้าง") + "คูปองไม่สำเร็จ: " + err.message);
-    }
-  };
-
-  // ✅ Delete coupon
-  const deleteCoupon = async (id) => {
-    if (!confirm("❓ ยืนยันการลบคูปองนี้?")) return;
-    try {
-      await supabase.from("coupons").delete().eq("id", id);
-      alert("✅ ลบคูปองสำเร็จ");
-      fetchStats(); // Reload
-    } catch (err) {
-      alert("❌ ลบคูปองไม่สำเร็จ");
-    }
-  };
-
-  // ✅ Edit coupon
-  const editCoupon = (coupon) => {
-    setEditingCoupon(coupon);
-    setCouponCode(coupon.code);
-    setCouponType(coupon.type);
-    setCouponValue(coupon.value);
-    window.scrollTo({ top: 400, behavior: 'smooth' });
-  };
-
-  // ✅ Cancel edit
-  const cancelEditCoupon = () => {
-    setEditingCoupon(null);
-    setCouponCode("");
-    setCouponValue("");
-    setCouponType("percent");
-  };
-
   return (
     <div className="page-container" style={{ maxWidth: "1000px", margin: "0 auto", padding: "20px" }}>
 
       {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "30px", flexWrap: "wrap", gap: "15px" }}>
-        <h1 style={{ fontSize: "32px", fontWeight: "800" }}>🛠 Admin Dashboard</h1>
+        <h1 style={{ fontSize: "32px", fontWeight: "800" }}>🏪 Store Owner Dashboard</h1>
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
           <button
-            onClick={() => navigate("/admin/users")}
+            onClick={() => navigate("/store/orders")}
             className="btn-primary"
             style={{ padding: "12px 24px", fontSize: "14px", borderRadius: "10px" }}
           >
-            👥 จัดการผู้ใช้
+            📦 ดูออเดอร์
           </button>
           <button
-            onClick={() => navigate("/admin/logs")}
+            onClick={() => navigate("/store/coupons")}
             className="btn-primary"
             style={{ padding: "12px 24px", fontSize: "14px", borderRadius: "10px" }}
           >
-            📊 ดู Logs ระบบ
+            🎫 จัดการคูปอง
           </button>
         </div>
       </div>
@@ -277,16 +246,16 @@ function AdminDashboard() {
           <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>📦 สินค้า</p>
         </div>
         <div className="glass-card" style={{ padding: "20px", textAlign: "center" }}>
-          <p style={{ fontSize: "24px", fontWeight: "bold", color: "var(--accent)", marginBottom: "5px" }}>{stats.totalUsers}</p>
-          <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>👥 ผู้ใช้</p>
+          <p style={{ fontSize: "24px", fontWeight: "bold", color: "var(--accent)", marginBottom: "5px" }}>{stats.totalOrders}</p>
+          <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>📋 ออเดอร์ทั้งหมด</p>
         </div>
         <div className="glass-card" style={{ padding: "20px", textAlign: "center" }}>
-          <p style={{ fontSize: "24px", fontWeight: "bold", color: "#facc15", marginBottom: "5px" }}>{stats.totalOrders}</p>
-          <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>📋 ออเดอร์</p>
+          <p style={{ fontSize: "24px", fontWeight: "bold", color: "#facc15", marginBottom: "5px" }}>{stats.pendingOrders}</p>
+          <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>⏳ รอการยืนยัน</p>
         </div>
         <div className="glass-card" style={{ padding: "20px", textAlign: "center" }}>
-          <p style={{ fontSize: "24px", fontWeight: "bold", color: "#22c55e", marginBottom: "5px" }}>{stats.totalCoupons}</p>
-          <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>🎫 คูปอง</p>
+          <p style={{ fontSize: "24px", fontWeight: "bold", color: "#22c55e", marginBottom: "5px" }}>{stats.completedOrders}</p>
+          <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>✅ สำเร็จ</p>
         </div>
       </div>
 
@@ -378,135 +347,12 @@ function AdminDashboard() {
         </div>
       </div>
 
-      {/* ADD COUPON */}
-      <div className="glass-card" style={{ padding: "30px", marginBottom: "40px" }}>
-        <h2 style={{ marginBottom: "20px", color: "var(--accent)" }}>
-          🎟 สร้างคูปองส่วนลด
-        </h2>
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "15px", alignItems: "flex-end" }}>
-          <div style={{ flex: 2, minWidth: "200px" }}>
-            <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "5px" }}>CODE:</p>
-            <input
-              className="input-glass"
-              value={couponCode}
-              onChange={(e) => setCouponCode(sanitizeInput(e.target.value))}
-              placeholder="เช่น WHYIT30"
-            />
-          </div>
-
-          <div style={{ flex: 1, minWidth: "100px" }}>
-            <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "5px" }}>ประเภท:</p>
-            <select
-              className="input-glass"
-              value={couponType}
-              onChange={(e) => setCouponType(e.target.value)}
-            >
-              <option value="percent">ลดเป็น %</option>
-              <option value="fixed">ลดเป็น บาท</option>
-            </select>
-          </div>
-
-          <div style={{ flex: 1, minWidth: "100px" }}>
-            <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "5px" }}>มูลค่า:</p>
-            <input
-              className="input-glass"
-              type="number"
-              value={couponValue}
-              onChange={(e) => setCouponValue(e.target.value)}
-              placeholder="0"
-            />
-          </div>
-
-          <button 
-            className="btn-primary" 
-            onClick={createCoupon} 
-            style={{ padding: "12px 24px", background: "var(--accent)" }}
-          >
-            {editingCoupon ? "💾 อัปเดตคูปอง" : "🎫 สร้างคูปอง"}
-          </button>
-
-          {editingCoupon && (
-            <button 
-              className="btn-primary" 
-              onClick={cancelEditCoupon} 
-              style={{ padding: "12px 24px", background: "transparent", border: "1px solid var(--card-border)" }}
-            >
-              ❌ ยกเลิก
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* COUPONS LIST */}
-      <div style={{ marginBottom: "40px" }}>
-        <h2 style={{ marginBottom: "20px", fontSize: "20px", fontWeight: "bold" }}>🎫 คูปองทั้งหมด ({coupons.length})</h2>
-        
-        {coupons.length === 0 ? (
-          <p style={{ color: "var(--text-muted)", textAlign: "center", padding: "40px 0" }}>ไม่มีคูปองในระบบ</p>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "20px" }}>
-            {coupons.map((coupon) => (
-              <div key={coupon.id} className="glass-card" style={{ padding: "20px" }}>
-                <div style={{ marginBottom: "15px" }}>
-                  <h3 style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "8px" }}>
-                    {coupon.code}
-                  </h3>
-                  <p style={{ color: "var(--text-muted)", fontSize: "13px", marginBottom: "8px" }}>
-                    ประเภท: <span style={{ color: "var(--primary)", fontWeight: "bold" }}>
-                      {coupon.type === "percent" ? `${coupon.value}%` : `${coupon.value} ฿`}
-                    </span>
-                  </p>
-                  <p style={{ color: coupon.is_active ? "#22c55e" : "#ef4444", fontSize: "13px", fontWeight: "bold" }}>
-                    {coupon.is_active ? "✅ เปิดใช้งาน" : "❌ ปิดใช้งาน"}
-                  </p>
-                </div>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <button
-                    onClick={() => editCoupon(coupon)}
-                    style={{
-                      flex: 1,
-                      padding: "8px",
-                      fontSize: "13px",
-                      background: "transparent",
-                      color: "var(--primary)",
-                      border: "1px solid var(--primary)",
-                      borderRadius: "6px",
-                      cursor: "pointer",
-                      fontWeight: "bold"
-                    }}
-                  >
-                    ✏️ แก้ไข
-                  </button>
-                  <button
-                    onClick={() => deleteCoupon(coupon.id)}
-                    style={{
-                      flex: 1,
-                      padding: "8px",
-                      fontSize: "13px",
-                      background: "var(--danger)20",
-                      color: "var(--danger)",
-                      border: "1px solid var(--danger)",
-                      borderRadius: "6px",
-                      cursor: "pointer",
-                      fontWeight: "bold"
-                    }}
-                  >
-                    🗑️ ลบ
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* PRODUCTS LIST */}
       <div>
-        <h2 style={{ marginBottom: "20px", fontSize: "20px", fontWeight: "bold" }}>📦 สินค้าทั้งหมด ({products.length})</h2>
+        <h2 style={{ marginBottom: "20px", fontSize: "20px", fontWeight: "bold" }}>📦 สินค้าของฉัน ({products.length})</h2>
         
         {products.length === 0 ? (
-          <p style={{ color: "var(--text-muted)", textAlign: "center", padding: "40px 0" }}>ไม่มีสินค้าในระบบ</p>
+          <p style={{ color: "var(--text-muted)", textAlign: "center", padding: "40px 0" }}>ยังไม่มีสินค้า</p>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "20px" }}>
             {products.map((product) => (
@@ -551,4 +397,4 @@ function AdminDashboard() {
   );
 }
 
-export default AdminDashboard;
+export default StoreOwnerDashboard;

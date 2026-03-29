@@ -28,7 +28,7 @@ function Home() {
     }
   };
 
-  const categories = ["All", "Mouse", "Keyboard", "Monitor", "Headset"];
+  const categories = ["All", "CPU", "Mainboard", "GPU", "RAM", "Storage", "Keyboard", "Headset", "Mouse", "Monitor"];
 
   const filteredProducts =
     selectedCategory === "All"

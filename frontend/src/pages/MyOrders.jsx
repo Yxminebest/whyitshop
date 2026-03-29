@@ -47,8 +47,32 @@ function MyOrders() {
 
     fetchMyOrders();
 
+    // ✅ Real-time subscription: อัปเดต status ทันทีเมื่อ Admin เปลี่ยน
+    let channel;
+    if (!authLoading && user?.id) {
+      channel = supabase
+        .channel(`my-orders-${user.id}`)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `user_id=eq.${user.id}`
+        }, (payload) => {
+          if (isMounted) {
+            // อัปเดต status เฉพาะ order ที่เปลี่ยน ไม่ fetch ใหม่ทั้งหมด
+            setOrders((prev) =>
+              prev.map((o) =>
+                o.id === payload.new.id ? { ...o, ...payload.new } : o
+              )
+            );
+          }
+        })
+        .subscribe();
+    }
+
     return () => {
       isMounted = false;
+      if (channel) supabase.removeChannel(channel);
     };
   }, [user?.id, authLoading]);
 
@@ -119,7 +143,7 @@ function MyOrders() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "30px" }}>
           {orders.map((order) => {
-            const slipUrl = getSlipUrl(order.slip);
+            const slipUrl = getSlipUrl(order.slip_url || order.slip);
             return (
               <div key={order.id} style={{ paddingBottom: "30px", borderBottom: "1px solid var(--card-border)" }}>
                 

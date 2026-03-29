@@ -7,8 +7,11 @@ import { getProducts } from "../api/productApi";
 function Products() {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
   const [loading, setLoading] = useState(true);
   const { addToCart } = useContext(CartContext);
+
+  const categories = ["All", "CPU", "Mainboard", "GPU", "RAM", "Storage", "Keyboard", "Headset", "Mouse", "Monitor"];
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -26,23 +29,53 @@ function Products() {
     fetchProducts();
   }, []);
 
-  const filteredProducts = products.filter((product) =>
-    product.name?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredProducts = products.filter((product) => {
+    const matchSearch = product.name?.toLowerCase().includes(search.toLowerCase());
+    const matchCategory = selectedCategory === "All" || product.category === selectedCategory;
+    return matchSearch && matchCategory;
+  });
 
   return (
     <div className="page-container">
       <h1 style={{ marginBottom: "20px", fontWeight: "800" }}>🛒 สินค้าทั้งหมด</h1>
 
+      {/* SEARCH */}
       <input
         type="text"
         className="input-glass"
         placeholder="🔍 ค้นหาสินค้า..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        style={{ maxWidth: "400px", marginBottom: "40px" }}
+        style={{ maxWidth: "400px", marginBottom: "25px" }}
       />
 
+      {/* CATEGORIES */}
+      <div
+        style={{
+          display: "flex",
+          gap: "15px",
+          marginBottom: "40px",
+          flexWrap: "wrap",
+        }}
+      >
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setSelectedCategory(cat)}
+            className={selectedCategory === cat ? "btn-primary" : "glass-card"}
+            style={{
+              padding: "8px 20px",
+              cursor: "pointer",
+              borderRadius: "25px",
+              fontSize: "14px",
+            }}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {/* PRODUCTS */}
       {loading ? (
         <p style={{ color: "var(--text-muted)" }}>กำลังโหลดสินค้า...</p>
       ) : (

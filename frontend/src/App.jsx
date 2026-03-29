@@ -8,7 +8,8 @@ import { CartProvider } from "./context/CartContext";
 import Navbar from "./components/Navbar";
 import Breadcrumb from "./components/Breadcrumb";
 import ProtectedRoute from "./components/ProtectedRoute";
-import AdminRoute from "./components/AdminRoute"; 
+import AdminRoute from "./components/AdminRoute";
+import StoreOwnerRoute from "./components/StoreOwnerRoute";
 
 /* ================= PUBLIC PAGES ================= */
 import Home from "./pages/Home";
@@ -27,6 +28,11 @@ import ResetPassword from "./pages/ResetPassword";
 /* ================= USER PAGES ================= */
 import Profile from "./pages/Profile";
 import MyOrders from "./pages/MyOrders";
+
+/* ================= STORE OWNER PAGES ================= */
+import StoreOwnerDashboard from "./pages/StoreOwnerDashboard";
+import StoreOwnerOrders from "./pages/StoreOwnerOrders";
+import StoreOwnerCoupons from "./pages/StoreOwnerCoupons";
 
 /* ================= ADMIN PAGES ================= */
 import AdminDashboard from "./pages/AdminDashboard";
@@ -71,6 +77,10 @@ function App() {
 
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/my-orders" element={<ProtectedRoute><MyOrders /></ProtectedRoute>} />
+
+              <Route path="/store/dashboard" element={<StoreOwnerRoute><StoreOwnerDashboard /></StoreOwnerRoute>} />
+              <Route path="/store/orders" element={<StoreOwnerRoute><StoreOwnerOrders /></StoreOwnerRoute>} />
+              <Route path="/store/coupons" element={<StoreOwnerRoute><StoreOwnerCoupons /></StoreOwnerRoute>} />
 
               <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
               <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />

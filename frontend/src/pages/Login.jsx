@@ -65,8 +65,14 @@ function Login() {
       // Log action
       logAction("LOGIN", `User ${data.user.email} logged in with role: ${role}`);
 
-      // Redirect
-      navigate(role === "admin" ? "/admin/dashboard" : "/");
+      // Redirect based on role
+      if (role === "admin") {
+        navigate("/admin/dashboard");
+      } else if (role === "store_owner") {
+        navigate("/store/dashboard");
+      } else {
+        navigate("/");
+      }
 
     } catch (err) {
       console.error("Login error:", err);
