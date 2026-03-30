@@ -52,8 +52,8 @@ function ProductDetail() {
 
       <div className="glass-card" style={{ display: "flex", flexWrap: "wrap", gap: "40px", alignItems: "flex-start", padding: "40px" }}>
         
-        <div style={{ flex: "1 1 350px" }}>
-          <img src={product.image || "https://via.placeholder.com/400"} alt={product.name} style={{ width: "100%", borderRadius: "16px", objectFit: "cover", boxShadow: "var(--shadow)" }} />
+        <div style={{ flexShrink: 0, width: "280px" }}>
+          <img src={product.image || "https://via.placeholder.com/400"} alt={product.name} style={{ width: "100%", height: "280px", borderRadius: "16px", objectFit: "contain", boxShadow: "var(--shadow)", background: "var(--bg-secondary)" }} />
         </div>
 
         <div style={{ flex: "2 1 400px" }}>
