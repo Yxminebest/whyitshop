@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { sendWelcomeEmail, sendOrderConfirmationEmail, sendOrderStatusUpdateEmail } from '../services/emailService.js';
 import supabase from '../config/supabase.js';
+import { accountLockoutMiddleware, recordFailedLogin, clearFailedLogins } from '../middleware/accountLockout.js';
 
 const router = Router();
 
@@ -85,7 +86,7 @@ router.post('/register', async (req, res) => {
  * 🔐 POST /api/auth/login
  * ระบบเข้าสู่ระบบผ่าน Supabase Auth
  */
-router.post('/login', async (req, res) => {
+router.post('/login', accountLockoutMiddleware, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -101,8 +102,13 @@ router.post('/login', async (req, res) => {
 
     if (loginError) {
       console.error('Supabase Login Error:', loginError.message);
+      // ✅ บันทึกการล็อคอินล้มเหลว เพื่อนับครั้งสำหรับ Account Lockout
+      await recordFailedLogin(email);
       return res.status(401).json({ error: '❌ อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
     }
+
+    // ✅ ล้างประวัติล็อคอินล้มเหลวเมื่อเข้าสู่ระบบสำเร็จ
+    await clearFailedLogins(email);
 
     // 2. ดึงข้อมูล Profile เพิ่มเติมจาก public.users (ถ้าต้องการ)
     const { data: userProfile } = await supabase

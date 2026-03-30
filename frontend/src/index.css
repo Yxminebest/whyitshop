@@ -1,8 +1,8 @@
 /* ================= GLOBAL & THEME VARIABLES ================= */
 :root {
   /* LIGHT MODE */
-  --bg-main: #f0f4f8;
-  --bg-secondary: #ffffff;
+  --bg-main: #c0392b;
+  --bg-secondary: #f5c6c0;
   --text-main: #0f172a;
   --text-muted: #64748b;
   --nav-bg: rgba(255, 255, 255, 0.75);
@@ -345,8 +345,8 @@ body {
 .text-gradient {
   font-size: 52px;
   font-weight: 900;
-  background: linear-gradient(90deg, var(--primary), var(--accent));
-  background-clip: text; /* ✅ แก้เส้นเหลืองแจ้งเตือน */
+  background: linear-gradient(90deg, #ffe0b2, #ffcc80);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }

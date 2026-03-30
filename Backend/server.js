@@ -85,7 +85,7 @@ app.use(express.urlencoded({ limit: "10kb", extended: false }));
 app.use(session({
   secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: false,
   cookie: { 
     secure: isProduction, // HTTPS only ในโหมด Production
     httpOnly: true,  // ป้องกัน XSS
@@ -93,10 +93,10 @@ app.use(session({
   }
 }));
 
-const csrfProtection = csrf({ cookie: false });
-// 💡 หมายเหตุ: ผมยังไม่ใส่ app.use(csrfProtection) ตรงนี้ 
-// เพื่อให้คุณทดสอบยิง API ผ่าน Postman ได้ง่ายๆ ก่อน 
-// (ถ้าเปิดใช้งาน จะต้องดึง Token จาก /api/csrf-token ไปแนบ Header ก่อนยิงทุกครั้ง)
+// ✅ CSRF Protection - ใช้เป็น middleware สำหรับ route ที่ต้องการ
+// API ที่ใช้ JWT Bearer token ใน Authorization header ป้องกัน CSRF โดยธรรมชาติอยู่แล้ว
+// csrfProtection ไว้ใช้กับ route ที่ใช้ session-based auth เท่านั้น
+export const csrfProtection = csrf({ cookie: false });
 
 // ✅ 6. Rate Limiting (OWASP A04: Insecure Design)
 const loginLimiter = rateLimit({

@@ -145,7 +145,14 @@ function MyOrders() {
           {orders.map((order) => {
             const slipUrl = getSlipUrl(order.slip_url || order.slip);
             return (
-              <div key={order.id} style={{ paddingBottom: "30px", borderBottom: "1px solid var(--card-border)" }}>
+              <div key={order.id} style={{ 
+                padding: "25px 30px", 
+                borderRadius: "16px",
+                border: "1px solid rgba(255,255,255,0.25)",
+                background: "rgba(255,255,255,0.12)",
+                backdropFilter: "blur(10px)",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.15)"
+              }}>
                 
                 {/* Header (เลขที่ออเดอร์ & วันที่) */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>

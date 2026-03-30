@@ -225,10 +225,12 @@ function Navbar({ theme, toggleTheme }) {
                 style={{ 
                   background: location.pathname === "/my-orders" ? "var(--primary)" : "transparent",
                   color: location.pathname === "/my-orders" ? "white" : "var(--text-main)",
-                  padding: "8px 18px", border: "none", borderRadius: "25px", cursor: "pointer", fontWeight: "bold", transition: "0.3s"
+                  padding: "8px 18px", border: "none", borderRadius: "25px", cursor: "pointer", fontWeight: "bold", transition: "0.3s",
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: "2px"
                 }}
               >
-                📦 My Orders
+                <span style={{ fontSize: "18px", lineHeight: "1" }}>📦</span>
+                <span style={{ whiteSpace: "nowrap" }}>My Orders</span>
               </button>
             )}
 
@@ -237,17 +239,18 @@ function Navbar({ theme, toggleTheme }) {
               <button
                 onClick={() => navigate("/cart")}
                 style={{ 
-                  background: location.pathname === "/cart" ? "var(--primary)" : "rgba(0, 212, 255, 0.1)",
-                  color: location.pathname === "/cart" ? "white" : "#00d4ff",
+                  background: location.pathname === "/cart" ? "#7b2d00" : "rgba(139, 69, 19, 0.15)",
+                  color: location.pathname === "/cart" ? "white" : "#7b2d00",
                   padding: "8px 18px", 
-                  border: "1px solid #00d4ff", 
+                  border: "2px solid #7b2d00", 
                   borderRadius: "25px", 
                   cursor: "pointer", 
                   fontWeight: "900",
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
-                  transition: "0.3s"
+                  transition: "0.3s",
+                  whiteSpace: "nowrap"
                 }}
               >
                 🛒 <span style={{ fontSize: "14px" }}>Cart ({cartCount})</span>
