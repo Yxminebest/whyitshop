@@ -39,7 +39,19 @@ function Cart() {
   }, []);
 
   const applyCoupon = async () => {
-    if (!coupon || !user) return alert("❌ กรุณาเข้าสู่ระบบก่อน");
+    // ถ้าไม่ได้กรอกโค้ด ให้แจ้งว่าไม่มีโค้ด
+    if (!coupon) {
+      setMessage({ text: "❌ ไม่มีโค้ด", type: "error" });
+      return;
+    }
+
+    // ถ้ายังไม่ล็อกอิน ให้แจ้งให้ล็อกอินก่อน
+    if (!user) {
+      alert("❌ กรุณาเข้าสู่ระบบก่อน");
+      navigate("/login");
+      return;
+    }
+
     setMessage({ text: "กำลังตรวจสอบ...", type: "" });
     
     // 1️⃣ ตรวจสอบคูปองพื้นฐาน
